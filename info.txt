@@ -1,0 +1,28 @@
+Workspace Nexjs
+
+Untuk menjalankan proyek ini setelah melakukan clone, ikuti langkah-langkah berikut:
+
+1. Install Dependencies
+Pastikan Anda berada di direktori proyek, lalu jalankan perintah berikut untuk menginstal semua dependensi yang diperlukan:
+
+cmnd: pnpm install
+
+2. Jalankan Proyek
+Setelah instalasi selesai, jalankan proyek menggunakan perintah berikut:
+
+cmnd:pnpm dev
+
+3. Akses di Browser
+Buka browser Anda dan akses proyek di:
+
+http://localhost:3000
+
+4. Pastikan Node.js Terinstal
+Pastikan Anda menggunakan versi Node.js yang sesuai dengan proyek ini. Berdasarkan file pnpm-lock.yaml, proyek ini membutuhkan Node.js versi:
+
+^18.17.0 || ^20.3.0 || >=21.0.0
+Anda dapat memeriksa versi Node.js Anda dengan perintah:
+
+node -v
+Jika Anda belum menginstal pnpm, Anda dapat menginstalnya dengan perintah berikut:
+npm install -g pnpm

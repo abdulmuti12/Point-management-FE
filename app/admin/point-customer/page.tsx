@@ -481,7 +481,7 @@ export default function PointCustomerPage() {
                         <Button
                           variant="outline"
                           size="sm"
-                          onClick={() => router.push(`/dashboard/point-customer/histories/${item.customer?.id || '?'}`)}
+                          onClick={() => router.push(`/admin/point-customer/histories/${item.customer?.id || '?'}`)}
                           disabled={!item.point?.id}
                           title={item.point?.id ? `Lihat history (${item.point.id})` : "Point rule tidak tersedia"}
                         >

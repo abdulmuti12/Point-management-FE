@@ -14,7 +14,7 @@ export default function HomePage() {
 
         if (token) {
           // Token exists, redirect to dashboard
-          router.push("/dashboard")
+          router.push("/admin")
         } else {
           // No token, redirect to login
           router.push("/login")

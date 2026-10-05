@@ -36,7 +36,7 @@ export function DashboardHeader() {
   }
 
   const handleAccountInfo = () => {
-    router.push("/dashboard/account")
+    router.push("/admin/account")
   }
 
   return (

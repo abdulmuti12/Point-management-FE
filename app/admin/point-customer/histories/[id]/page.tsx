@@ -235,7 +235,7 @@ export default function PointCustomerHistoriesPage() {
   }
 
   const handleBack = () => {
-    router.push("/dashboard/point-customer")
+    router.push("/admin/point-customer")
   }
 
   const handleDetailClick = (record: HistoryRecord) => {

@@ -1,0 +1,50 @@
+{
+  "permissions": {
+    "allow": [
+      "Read(//etc/**)",
+      "Bash(find /Applications/XAMPP/xamppfiles/htdocs -name \"nginx.conf\" -o -name \"*.conf\" 2>/dev/null | grep -i nginx | head -5)",
+      "Read(//Applications/XAMPP/xamppfiles/htdocs/**)",
+      "Bash(curl -s -X POST http://127.0.0.1:8000/api/login -H \"Content-Type: application/json\" -d '{\"email\":\"admin@admin.com\",\"password\":\"password\"}')",
+      "Bash(npm run *)",
+      "Bash(curl -s http://localhost:3000)",
+      "Bash(curl -s -X POST http://localhost:8000/api/admins/login -H \"Content-Type: application/json\" -d '{\"email\":\"admin@homelogic.com\",\"password\":\"password\"}')",
+      "Bash(curl -s http://localhost:8000/api/admins/gift)",
+      "Bash(curl -s http://localhost:3000/dashboard/gift)",
+      "Bash(curl -s -X POST http://localhost:8000/api/admins/login -H \"Content-Type: application/json\" -d '{\"email\":\"admin@example.com\",\"password\":\"password\"}')",
+      "Bash(mkdir -p /Applications/XAMPP/xamppfiles/htdocs/FrontEnd-Admin-luxury-NextJS-/app/dashboard/point-customer/histories/\\\\[id\\\\])",
+      "Bash(mv /Applications/XAMPP/xamppfiles/htdocs/FrontEnd-Admin-luxury-NextJS-/app/dashboard/point-customer/histories/page.tsx /Applications/XAMPP/xamppfiles/htdocs/FrontEnd-Admin-luxury-NextJS-/app/dashboard/point-customer/histories/\\\\[id\\\\]/page.tsx)",
+      "Bash(php -i)",
+      "Bash(php -r \"echo ini_get\\('post_max_size'\\);\")",
+      "Bash(php -r \"echo ini_get\\('post_max_size'\\); echo PHP_EOL; echo ini_get\\('upload_max_filesize'\\); echo PHP_EOL; echo ini_get\\('memory_limit'\\);\")",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\" -X POST http://localhost:8000/api/admins/project -H \"Authorization: Bearer test\" -d \"test=data\")",
+      "Bash(node -e ' *)",
+      "Bash(curl -s -X POST http://localhost:8000/api/admins/project -H \"Authorization: Bearer invalid\" -F \"file=@/etc/passwd\")",
+      "Bash(git checkout *)",
+      "Bash(python3 -c \"print\\(75360 * 1024\\)\")",
+      "Bash(python3 -c \"print\\(5 * 1024 * 1024\\)\")",
+      "Bash(python3 -c ' *)",
+      "Bash(python3 -c \"import sys,json; d=json.load\\(sys.stdin\\); print\\(f'   localhost → Status: {d.get\\(\\\\\"status\\\\\",200\\)}'\\)\")",
+      "Bash(python3 -c \"import sys,json; d=json.load\\(sys.stdin\\); desc=d['data']['description']; print\\(f'   Input:  <script>alert\\(1\\)</script>'\\); print\\(f'   Stored: {desc}'\\); print\\(f'   XSS Blocked: {\\\\\"<script>\\\\\" not in desc}'\\)\")",
+      "Bash(curl -s -X POST \"http://localhost:8000/api/admins/login\" -H \"Content-Type: application/json\" -H \"Origin: http://evil.com\" -d '{\"email\":\"tes12@gmail.com\",\"password\":\"Abdulmuti_12\"}')",
+      "Bash(python3 -c \"import sys,json; d=json.load\\(sys.stdin\\); print\\(f'   Login: {d.get\\(\\\\\"status\\\\\",403\\)}'\\)\")",
+      "Bash(curl -s -X POST \"http://localhost:8000/api/admins/login\" -H \"Content-Type: application/json\" -H \"Origin: http://localhost:3000\" -d '{\"email\":\"tes12@gmail.com\",\"password\":\"Abdulmuti_12\"}')",
+      "Bash(python3 -c \"import sys,json; d=json.load\\(sys.stdin\\); desc=d['data']['description']; print\\(f'   Stored: {desc}'\\); print\\(f'   Safe: {\\\\\"<script>\\\\\" not in desc}'\\)\")",
+      "Bash(awk '/^Route::prefix/{p=1} p{print} /^}\\);/{if\\(p\\) {p=0}}' /Applications/XAMPP/xamppfiles/htdocs/API_BACKEND_LAP/routes/api.php)",
+      "Bash(curl -s -X POST \"http://localhost:8000/api/email-subscriber\" -H \"Origin: http://evil.com\" -H \"Content-Type: application/json\" -d '{\"email\":\"test@example.com\"}')",
+      "Bash(python3 -c \"import sys,json; d=json.load\\(sys.stdin\\); print\\(f'   evil.com → Status: {d.get\\(\\\\\"status\\\\\",403\\)}'\\)\")",
+      "Bash(curl -s -X POST \"http://localhost:8000/api/email-subscriber\" -H \"Origin: http://localhost:3000\" -H \"Content-Type: application/json\" -d '{\"email\":\"test@example.com\"}')",
+      "Bash(curl -s -X POST \"http://localhost:8000/api/customers/contact-us\" -H \"Origin: http://evil.com\" -H \"Content-Type: application/json\" -d '{\"name\":\"Test\",\"email\":\"test@example.com\",\"description\":\"Hello\"}')",
+      "Bash(curl -s -X POST \"http://localhost:8000/api/customers/contact-us\" -H \"Origin: http://localhost:3000\" -H \"Content-Type: application/json\" -d '{\"name\":\"Test\",\"email\":\"test@example.com\",\"description\":\"Hello\"}')",
+      "Bash(curl -s -X POST \"http://localhost:8000/api/customers/contact-us\" -H \"Origin: http://localhost:3000\" -H \"Content-Type: application/json\" -d '{\"name\":\"<script>alert\\(1\\)</script>\",\"email\":\"test@example.com\",\"description\":\"Hello <b>World</b>\"}')",
+      "Bash(python3 -c \"import sys,json; d=json.load\\(sys.stdin\\); data=d['data']; print\\(f'   Input:  <script>alert\\(1\\)</script>'\\); print\\(f'   Stored: {data[\\\\\"name\\\\\"]}'\\); print\\(f'   Safe: {\\\\\"<script>\\\\\" not in data[\\\\\"name\\\\\"]}'\\)\")",
+      "Bash(pnpm install *)",
+      "Bash(node -e \"console.log\\(require\\('./node_modules/next/package.json'\\).version\\)\")",
+      "Bash(pnpm peers *)"
+    ],
+    "additionalDirectories": [
+      "/Applications/XAMPP/xamppfiles/htdocs/API_BACKEND_LAP/app/Http/Controllers/Admin",
+      "/Applications/XAMPP/xamppfiles/htdocs/gacha-api/app/Models",
+      "/Applications/XAMPP/xamppfiles/htdocs/API_BACKEND_LAP/app/Services"
+    ]
+  }
+}

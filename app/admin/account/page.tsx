@@ -114,7 +114,7 @@ export default function AccountPage() {
           <h1 className="text-3xl font-bold tracking-tight text-slate-900">Account Information</h1>
           <p className="text-slate-500 mt-1">View and manage your personal account details</p>
         </div>
-        <Button variant="outline" onClick={() => router.push("/dashboard")} className="flex items-center gap-2 h-10">
+        <Button variant="outline" onClick={() => router.push("/admin")} className="flex items-center gap-2 h-10">
           <ArrowLeft className="h-4 w-4" />
           Back to Dashboard
         </Button>

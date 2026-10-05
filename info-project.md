@@ -1,3 +1,7 @@
 untuk frontend lokasi projectnya htdocs/point-project/Point-management-FE
-untuk frontend lokasi projectnya htdocs/point-project/API-Poin
+untuk frontend lokasi projectnya htdocs/point-project/API-Point
+
+
+
+
 

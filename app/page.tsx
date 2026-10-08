@@ -10,18 +10,19 @@ export default function HomePage() {
   useEffect(() => {
     const checkAuth = () => {
       try {
-        const token = localStorage.getItem("token")
+        const adminToken = localStorage.getItem("token")
+        const customerToken = localStorage.getItem("customer_token")
 
-        if (token) {
-          // Token exists, redirect to dashboard
+        if (customerToken) {
+          router.push("/customer")
+        } else if (adminToken) {
           router.push("/admin")
         } else {
-          // No token, redirect to login
-          router.push("/login")
+          router.push("/customer/login")
         }
       } catch (error) {
         console.error("Auth check error:", error)
-        router.push("/login")
+        router.push("/customer/login")
       } finally {
         setIsLoading(false)
       }

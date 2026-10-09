@@ -7,8 +7,30 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Eye, EyeOff, Loader2, Lock, Mail } from "lucide-react"
+import { motion, AnimatePresence } from "motion/react"
 
 const API_BASE_URL = (process.env.NEXT_PUBLIC_API_URL || "").replace(/\/$/, "")
+
+/* ── Motion variants ─────────────────────────────────────────── */
+const formVariants = {
+  hidden: { opacity: 0, y: 24 },
+  visible: {
+    opacity: 1,
+    y: 0,
+    transition: { duration: 0.5, ease: [0.25, 0.46, 0.45, 0.94] as [number, number, number, number] },
+  },
+}
+
+const inputVariants = {
+  hidden: { opacity: 0, y: 12 },
+  visible: (i: number) => ({
+    opacity: 1,
+    y: 0,
+    transition: { delay: 0.15 + i * 0.08, duration: 0.4, ease: [0.25, 0.46, 0.45, 0.94] as [number, number, number, number] },
+  }),
+}
+
+/* ── helpers ─────────────────────────────────────────────────── */
 const STORAGE_BASE_URL = process.env.NEXT_PUBLIC_STORAGE_URL
   ? `${process.env.NEXT_PUBLIC_STORAGE_URL.replace(/\/$/, "")}/`
   : API_BASE_URL
@@ -73,9 +95,9 @@ function GoogleButton({
       onClick={onClick}
       disabled={loading}
       className="relative w-full h-12 rounded-xl
-                 bg-white/[0.04] border border-white/10
+                 bg-white/60 border border-black/10
                  flex items-center justify-center gap-3
-                 hover:bg-white/[0.08] hover:border-white/20
+                 hover:bg-white/80 hover:border-black/20
                  active:scale-[0.98] transition-all
                  disabled:opacity-50 disabled:cursor-not-allowed
                  overflow-hidden"
@@ -102,7 +124,7 @@ function GoogleButton({
           />
         </svg>
       )}
-      <span className="text-[14px] font-medium text-slate-200">
+      <span className="text-[14px] font-medium text-[#1a1a1a]">
         {loading ? "Menghubungkan ke Google…" : "Masuk dengan Google"}
       </span>
     </button>
@@ -309,10 +331,10 @@ export default function CustomerLoginPage() {
 
   /* ── shared form input class ──────────────────────────────── */
   const inputCls = `
-    h-12 bg-white/[0.04] border border-white/10
-    text-white text-[15px] placeholder:text-slate-600
+    h-12 bg-white/70 border border-black/10
+    text-[#1a1a1a] text-[15px] placeholder:text-slate-400
     rounded-xl outline-none
-    focus:bg-white/[0.06] focus:border-blue-500/50 focus:ring-2 focus:ring-blue-500/20
+    focus:bg-white focus:border-blue-500/60 focus:ring-2 focus:ring-blue-500/25
     transition-colors disabled:opacity-50
   `
 
@@ -325,14 +347,14 @@ export default function CustomerLoginPage() {
       <div
         className="relative hidden lg:flex flex-col items-center justify-center
                    w-[44%] shrink-0
-                   bg-gradient-to-br from-[#0B1120] via-[#0E1830] to-[#0B1120]
-                   border-r border-white/[0.06] overflow-hidden
+                   bg-[#F5F2EB]
+                   border-r border-black/[0.06] overflow-hidden
                    p-16"
       >
         <div className="absolute -top-24 -left-24 w-[420px] h-[420px]
-                        rounded-full bg-blue-500/[0.07] blur-[110px] pointer-events-none" />
+                        rounded-full bg-blue-400/[0.12] blur-[110px] pointer-events-none" />
         <div className="absolute -bottom-24 -right-16 w-[300px] h-[300px]
-                        rounded-full bg-cyan-500/[0.06] blur-[90px] pointer-events-none" />
+                        rounded-full bg-amber-300/[0.10] blur-[90px] pointer-events-none" />
 
         <div className="relative z-10 flex flex-col items-center text-center max-w-sm">
           {logoUrl ? (
@@ -346,15 +368,15 @@ export default function CustomerLoginPage() {
             <LogoFallback size="lg" />
           )}
 
-          <h1 className="text-4xl font-bold tracking-tight mb-3 leading-tight">
+          <h1 className="text-4xl font-bold tracking-tight mb-3 leading-tight text-[#1a1a1a]">
             Point
-            <span className="text-blue-400"> Management</span>
+            <span className="text-blue-600"> Management</span>
           </h1>
-          <p className="text-sm leading-relaxed text-slate-500">
+          <p className="text-sm leading-relaxed text-[#6b6b6b]">
             Portal pelanggan untuk memantau poin, aktivitas, dan reward Anda
           </p>
 
-          <p className="mt-14 text-xs text-slate-700">
+          <p className="mt-14 text-xs text-[#a0a0a0]">
             &copy; {new Date().getFullYear()} Point Management
           </p>
         </div>
@@ -363,8 +385,12 @@ export default function CustomerLoginPage() {
       {/* ════════════════════════════════════════════════════
           RIGHT — Form panel
       ════════════════════════════════════════════════════ */}
-      <div className="flex-1 flex items-center justify-center p-5 sm:p-8 lg:p-12">
-        <div className="w-full max-w-sm sm:max-w-[380px]">
+      <div
+        className="flex-1 relative flex items-center justify-center p-5 sm:p-8 lg:p-12
+                   bg-[url('/images/login-bg-right.png')] bg-cover bg-center"
+      >
+        <div className="absolute inset-0 bg-white/[0.35] pointer-events-none" />
+        <div className="relative z-10 w-full max-w-sm sm:max-w-[380px]">
 
           {/* Mobile compact header */}
           <div className="lg:hidden flex flex-col items-center mb-8">
@@ -378,15 +404,15 @@ export default function CustomerLoginPage() {
             ) : (
               <LogoFallback size="sm" />
             )}
-            <h1 className="text-xl font-bold tracking-tight">Selamat Datang</h1>
-            <p className="text-[13px] text-slate-500 mt-1">
+            <h1 className="text-xl font-bold tracking-tight text-[#1a1a1a]">Selamat Datang</h1>
+            <p className="text-[13px] text-[#6b6b6b] mt-1">
               Masuk ke akun pelanggan Anda
             </p>
           </div>
 
           {/* Desktop heading */}
           <div className="hidden lg:block mb-10">
-            <p className="text-sm text-slate-500">
+            <p className="text-sm text-[#6b6b6b]">
               Silakan masuk ke portal pelanggan untuk melanjutkan.
             </p>
           </div>
@@ -400,26 +426,38 @@ export default function CustomerLoginPage() {
 
           {/* ── Divider ──────────────────────────────────────── */}
           <div className="flex items-center gap-4 mb-6">
-            <div className="flex-1 h-px bg-white/[0.08]" />
-            <span className="text-[11px] text-slate-600 uppercase tracking-widest font-medium">
+            <div className="flex-1 h-px bg-black/[0.10]" />
+            <span className="text-[11px] text-[#8a8a8a] uppercase tracking-widest font-medium">
               atau
             </span>
-            <div className="flex-1 h-px bg-white/[0.08]" />
+            <div className="flex-1 h-px bg-black/[0.10]" />
           </div>
 
           {/* ── Manual form ─────────────────────────────────── */}
-          <form onSubmit={handleManualSubmit} className="space-y-5">
+          <motion.form
+            onSubmit={handleManualSubmit}
+            variants={formVariants}
+            initial="hidden"
+            animate="visible"
+            className="space-y-5"
+          >
 
             {/* Email */}
-            <div className="space-y-1.5">
+            <motion.div
+              className="space-y-1.5"
+              variants={inputVariants}
+              custom={0}
+              initial="hidden"
+              animate="visible"
+            >
               <Label
                 htmlFor="email"
-                className="text-[13px] font-medium text-slate-400"
+                className="text-[13px] font-medium text-[#4a4a4a]"
               >
                 Email
               </Label>
               <div className="relative">
-                <Mail className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-500" />
+                <Mail className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-[#9a9a9a]" />
                 <Input
                   id="email"
                   type="email"
@@ -432,18 +470,24 @@ export default function CustomerLoginPage() {
                   className={`${inputCls} pl-10`}
                 />
               </div>
-            </div>
+            </motion.div>
 
             {/* Password */}
-            <div className="space-y-1.5">
+            <motion.div
+              className="space-y-1.5"
+              variants={inputVariants}
+              custom={1}
+              initial="hidden"
+              animate="visible"
+            >
               <Label
                 htmlFor="password"
-                className="text-[13px] font-medium text-slate-400"
+                className="text-[13px] font-medium text-[#4a4a4a]"
               >
                 Password
               </Label>
               <div className="relative">
-                <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-500" />
+                <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-[#9a9a9a]" />
                 <Input
                   id="password"
                   type={showPassword ? "text" : "password"}
@@ -465,16 +509,35 @@ export default function CustomerLoginPage() {
                       : "Tampilkan password"
                   }
                   className="absolute right-3.5 top-1/2 -translate-y-1/2
-                             text-slate-500 hover:text-slate-300 transition-colors"
+                             text-[#7a7a7a] hover:text-[#1a1a1a] transition-colors
+                             disabled:opacity-40"
                 >
-                  {showPassword ? (
-                    <EyeOff className="h-4 w-4" />
-                  ) : (
-                    <Eye className="h-4 w-4" />
-                  )}
+                  <AnimatePresence mode="wait">
+                    {showPassword ? (
+                      <motion.span
+                        key="eye-open"
+                        initial={{ opacity: 0, scale: 0.4, rotate: -30 }}
+                        animate={{ opacity: 1, scale: 1, rotate: 0 }}
+                        exit={{ opacity: 0, scale: 0.4, rotate: 30 }}
+                        transition={{ type: "spring", stiffness: 400, damping: 15 }}
+                      >
+                        <Eye className="h-4 w-4" />
+                      </motion.span>
+                    ) : (
+                      <motion.span
+                        key="eye-closed"
+                        initial={{ opacity: 0, scale: 0.4, rotate: 30 }}
+                        animate={{ opacity: 1, scale: 1, rotate: 0 }}
+                        exit={{ opacity: 0, scale: 0.4, rotate: -30 }}
+                        transition={{ type: "spring", stiffness: 400, damping: 15 }}
+                      >
+                        <EyeOff className="h-4 w-4" />
+                      </motion.span>
+                    )}
+                  </AnimatePresence>
                 </button>
               </div>
-            </div>
+            </motion.div>
 
             {/* Submit */}
             <div className="pt-1">
@@ -499,17 +562,17 @@ export default function CustomerLoginPage() {
             </div>
 
             {/* Register hint */}
-            <p className="text-center text-xs text-slate-600 leading-relaxed">
+            <p className="text-center text-xs text-[#8a8a8a] leading-relaxed">
               Belum punya akun?{" "}
               <button
                 type="button"
                 onClick={() => router.push("/customer/register")}
-                className="text-blue-400 hover:text-blue-300 transition-colors font-medium"
+                className="text-blue-600 hover:text-blue-700 transition-colors font-medium"
               >
                 Daftar sekarang
               </button>
             </p>
-          </form>
+          </motion.form>
         </div>
       </div>
     </div>

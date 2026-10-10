@@ -46,14 +46,14 @@ export function CustomerSidebar({
   const sidebarContent = (
     <div className="flex flex-col h-full">
       {/* Header */}
-      <div className="flex items-center justify-between p-5 border-b border-white/[0.06]">
+      <div className="flex items-center justify-between p-5 border-b border-black/[0.08]">
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-lg bg-blue-500/[0.12] border border-blue-500/[0.2]
-                          flex items-center justify-center text-blue-400 font-bold text-sm">
+          <div className="w-10 h-10 rounded-lg bg-blue-600/[0.1] border border-blue-600/[0.2]
+                          flex items-center justify-center text-blue-600 font-bold text-sm">
             {customerName ? customerName.charAt(0).toUpperCase() : "P"}
           </div>
           <div>
-            <p className="text-sm font-semibold text-white truncate max-w-[140px]">
+            <p className="text-sm font-semibold text-slate-800 truncate max-w-[140px]">
               {customerName}
             </p>
             <p className="text-[11px] text-slate-500">Customer Portal</p>
@@ -61,7 +61,7 @@ export function CustomerSidebar({
         </div>
         <button
           onClick={onMobileClose}
-          className="lg:hidden text-slate-400 hover:text-white transition-colors"
+          className="lg:hidden text-slate-500 hover:text-slate-900 transition-colors"
         >
           <X className="w-5 h-5" />
         </button>
@@ -79,8 +79,8 @@ export function CustomerSidebar({
                          text-[14px] font-medium transition-colors
                          ${
                            active
-                             ? "bg-blue-500/[0.12] text-blue-400"
-                             : "text-slate-400 hover:text-white hover:bg-white/[0.04]"
+                             ? "bg-blue-600/[0.12] text-blue-700"
+                             : "text-slate-600 hover:text-slate-900 hover:bg-slate-900/[0.04]"
                          }`}
             >
               <Icon className="w-4.5 h-4.5 shrink-0" />
@@ -91,12 +91,12 @@ export function CustomerSidebar({
       </nav>
 
       {/* Footer */}
-      <div className="p-3 border-t border-white/[0.06]">
+      <div className="p-3 border-t border-black/[0.08]">
         <button
           onClick={handleLogout}
           className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg
-                     text-[14px] font-medium text-slate-400
-                     hover:text-red-400 hover:bg-red-500/[0.06] transition-colors"
+                     text-[14px] font-medium text-slate-600
+                     hover:text-red-600 hover:bg-red-500/[0.06] transition-colors"
         >
           <LogOut className="w-4.5 h-4.5" />
           Keluar
@@ -109,7 +109,7 @@ export function CustomerSidebar({
     <>
       {/* Desktop sidebar */}
       <aside className="hidden lg:flex flex-col w-[240px] shrink-0
-                        border-r border-white/[0.06] bg-[#0C1222]">
+                        border-r border-black/[0.08] bg-white/40 backdrop-blur">
         {sidebarContent}
       </aside>
 
@@ -124,7 +124,7 @@ export function CustomerSidebar({
       {/* Mobile sidebar drawer */}
       <aside
         className={`fixed top-0 left-0 z-50 lg:hidden w-[240px] h-full
-                    bg-[#0C1222] border-r border-white/[0.06]
+                    bg-white/80 backdrop-blur border-r border-black/[0.08]
                     transition-transform duration-200
                     ${mobileOpen ? "translate-x-0" : "-translate-x-full"}`}
       >

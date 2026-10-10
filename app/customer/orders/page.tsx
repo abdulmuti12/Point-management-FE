@@ -15,11 +15,11 @@ export default function CustomerOrdersPage() {
 
   return (
     <div className="p-6 space-y-6">
-      <h1 className="text-xl font-bold">Pesanan Saya</h1>
-      <div className="rounded-xl bg-white/[0.03] border border-white/[0.06] p-8 text-center">
-        <ShoppingBag className="w-10 h-10 mx-auto text-slate-700 mb-3" />
-        <p className="text-slate-500 text-sm">Belum ada pesanan.</p>
-        <p className="text-slate-600 text-xs mt-1">
+      <h1 className="text-xl font-bold text-slate-900">Pesanan Saya</h1>
+      <div className="rounded-xl bg-white/50 border border-black/[0.08] p-8 text-center backdrop-blur-sm">
+        <ShoppingBag className="w-10 h-10 mx-auto text-slate-500 mb-3" />
+        <p className="text-slate-600 text-sm">Belum ada pesanan.</p>
+        <p className="text-slate-500 text-xs mt-1">
           Pesanan Anda akan tampil di sini setelah melakukan pembelian.
         </p>
       </div>

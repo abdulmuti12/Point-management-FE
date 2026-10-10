@@ -59,6 +59,12 @@ interface OrderCustomer {
   avatar?: string | null
 }
 
+interface PointRule {
+  name: string
+  range_point: number
+  point: number
+}
+
 interface OrderItem {
   product_name: string
   variant_name: string
@@ -122,6 +128,11 @@ interface OrderDetail {
   items: OrderItemFull[]
   totals: OrderTotals
   transaction: OrderTransaction | null
+  customer_total_transaction?: number
+  customer_points?: number
+  order_points_delta?: number
+  recorded_points?: number
+  point_rule?: PointRule | null
 }
 
 interface Order {
@@ -136,6 +147,11 @@ interface Order {
   total_items: number
   item_count: number
   first_item: OrderItem
+  customer_total_transaction?: number
+  customer_points?: number
+  order_points_delta?: number
+  recorded_points?: number
+  point_rule?: PointRule | null
 }
 
 interface PaginationLink {
@@ -1126,6 +1142,7 @@ export default function OrderPage() {
                 <TableHead>First Item</TableHead>
                 <TableHead>Items</TableHead>
                 <TableHead>Total</TableHead>
+                <TableHead>Points</TableHead>
                 <TableHead>Status</TableHead>
                 <TableHead>Date</TableHead>
                 <TableHead className="text-right">Actions</TableHead>
@@ -1190,6 +1207,24 @@ export default function OrderPage() {
                         {formatCurrency(order.grand_total)}
                       </TableCell>
                       <TableCell>
+                        {order.status === "cancelled" ? (
+                          <span className="text-xs text-slate-400">—</span>
+                        ) : order.status === "delivered" || order.status === "success" ? (
+                          <div className="flex flex-col">
+                            <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold bg-amber-100 text-amber-800">
+                              +{(order.order_points_delta ?? 0).toLocaleString()} pts
+                            </span>
+                            {order.point_rule && (
+                              <span className="text-[10px] text-slate-400 mt-0.5">
+                                total {((order.customer_points ?? 0)).toLocaleString()} pts
+                              </span>
+                            )}
+                          </div>
+                        ) : (
+                          <span className="text-xs text-slate-400 italic">pending</span>
+                        )}
+                      </TableCell>
+                      <TableCell>
                         <span
                           className={`inline-flex items-center space-x-1 px-2.5 py-1 rounded-full text-xs font-medium ${statusInfo.color}`}
                         >
@@ -1213,7 +1248,7 @@ export default function OrderPage() {
                 })
               ) : (
                 <TableRow>
-                  <TableCell colSpan={8} className="text-center py-8 text-slate-500">
+                  <TableCell colSpan={9} className="text-center py-8 text-slate-500">
                     {searchValue ? `No orders found matching "${searchValue}".` : "No order data available."}
                   </TableCell>
                 </TableRow>
@@ -1497,6 +1532,57 @@ export default function OrderPage() {
                       </span>
                     </div>
                   </div>
+                </div>
+
+                {/* Points Earned */}
+                <div className="space-y-2">
+                  <h4 className="font-medium text-slate-700 flex items-center space-x-2">
+                    <span className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-amber-100 text-amber-600 text-xs font-bold">
+                      P
+                    </span>
+                    <span>Points Earned</span>
+                  </h4>
+                  {selectedOrderDetail.status === "cancelled" ? (
+                    <div className="p-4 border border-red-200 bg-red-50 rounded-lg">
+                      <p className="text-sm text-red-700">
+                        Order dibatalkan — tidak ada point yang dikreditkan.
+                      </p>
+                    </div>
+                  ) : (selectedOrderDetail.status === "delivered" || selectedOrderDetail.status === "success") ? (
+                    <div className="p-4 border border-amber-200 bg-amber-50 rounded-lg space-y-3">
+                      <div className="grid grid-cols-2 gap-3">
+                        <div>
+                          <p className="text-xs text-amber-700 mb-1">Point dari order ini</p>
+                          <p className="text-xl font-bold text-amber-900">
+                            +{((selectedOrderDetail.order_points_delta ?? 0)).toLocaleString()} pts
+                          </p>
+                        </div>
+                        <div>
+                          <p className="text-xs text-amber-700 mb-1">Total point customer</p>
+                          <p className="text-xl font-bold text-amber-900">
+                            {(selectedOrderDetail.customer_points ?? 0).toLocaleString()} pts
+                          </p>
+                        </div>
+                      </div>
+                      {selectedOrderDetail.point_rule && (
+                        <div className="text-xs text-amber-700 bg-amber-100/50 rounded p-2">
+                          Rule: <b>{selectedOrderDetail.point_rule.name}</b> — setiap{" "}
+                          {formatCurrency(selectedOrderDetail.point_rule.range_point)} transaksi ={" "}
+                          {selectedOrderDetail.point_rule.point} point
+                        </div>
+                      )}
+                      <div className="text-xs text-amber-600">
+                        Total transaksi customer:{" "}
+                        <b>{formatCurrency(selectedOrderDetail.customer_total_transaction ?? 0)}</b>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="p-4 border border-dashed border-slate-300 rounded-lg text-center">
+                      <p className="text-sm text-slate-500">
+                        Point akan dikreditkan setelah order berstatus <b>Delivered</b>.
+                      </p>
+                    </div>
+                  )}
                 </div>
 
                 {/* Transaction */}

@@ -17,6 +17,8 @@ import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+import { adminFetch } from "@/lib/auth"
+import type { PaginationMeta as SharedPaginationMeta } from "@/lib/types"
 
 interface Campaign {
   id: number
@@ -69,14 +71,7 @@ interface CampaignDetail {
   updated_at: string
 }
 
-interface PaginationMeta {
-  current_page: number
-  from: number
-  last_page: number
-  per_page: number
-  to: number
-  total: number
-}
+type PaginationMeta = SharedPaginationMeta
 
 interface ApiResponse {
   success: boolean
@@ -246,37 +241,11 @@ export default function CampaignPage() {
       }
       setError(null)
 
-      const token = localStorage.getItem("token")
-      if (!token) {
-        console.error("[v0] No token found in localStorage")
-        setError("Authentication required. Please login again.")
-        return
+      const { ok, data } = await adminFetch(`admins/banner?page=${page}`)
+
+      if (!ok) {
+        throw new Error(`HTTP error! status: ${data?.status || "unknown"}`)
       }
-
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL
-      if (!apiUrl) {
-        throw new Error("API URL is not configured. Please set NEXT_PUBLIC_API_URL environment variable.")
-      }
-
-      const response = await fetch(`${apiUrl}/admins/banner?page=${page}`, {
-        method: "GET",
-        headers: {
-          Authorization: `Bearer ${token}`,
-          "Content-Type": "application/json",
-        },
-      })
-
-      if (response.status === 401) {
-        console.error("[v0] Authentication failed - 401 status received")
-        setError("Authentication failed. Your session may have expired.")
-        return
-      }
-
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`)
-      }
-
-      const data: ApiResponse = await parseJsonResponse(response)
 
       if (data.success) {
         setCampaigns(data.data.data.data)
@@ -286,7 +255,7 @@ export default function CampaignPage() {
         setError(data.message || "Failed to fetch campaigns")
       }
     } catch (error) {
-      console.error("[v0] Error fetching campaigns:", error)
+      console.error("Error fetching campaigns:", error)
       setError(error instanceof Error ? error.message : "Failed to fetch campaigns. Please try again.")
     } finally {
       setLoading(false)
@@ -310,37 +279,11 @@ export default function CampaignPage() {
     setDetailedCampaignData(null)
 
     try {
-      const token = localStorage.getItem("token")
-      if (!token) {
-        console.error("[v0] No token found when fetching campaign details")
-        setDetailError("Authentication required. Please login again.")
-        return
+      const { ok, data } = await adminFetch(`admins/banner/${campaign.id}`)
+
+      if (!ok) {
+        throw new Error(`HTTP error! status: ${data?.status || "unknown"}`)
       }
-
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL
-      if (!apiUrl) {
-        throw new Error("API URL is not configured")
-      }
-
-      const response = await fetch(`${apiUrl}/admins/banner/${campaign.id}`, {
-        method: "GET",
-        headers: {
-          Authorization: `Bearer ${token}`,
-          "Content-Type": "application/json",
-        },
-      })
-
-      if (response.status === 401) {
-        console.error("[v0] Authentication failed when fetching campaign details - 401 status")
-        setDetailError("Authentication failed. Your session may have expired.")
-        return
-      }
-
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`)
-      }
-
-      const data: DetailApiResponse = await parseJsonResponse(response)
 
       if (data.success) {
         setDetailedCampaignData(data.data.general)
@@ -348,7 +291,7 @@ export default function CampaignPage() {
         setDetailError(data.message || "Failed to fetch campaign details")
       }
     } catch (error) {
-      console.error("[v0] Error fetching campaign details:", error)
+      console.error("Error fetching campaign details:", error)
       setDetailError(error instanceof Error ? error.message : "Failed to fetch campaign details. Please try again.")
     } finally {
       setDetailLoading(false)
@@ -400,18 +343,6 @@ export default function CampaignPage() {
       setCreateLoading(true)
       setCreateError(null)
 
-      const token = localStorage.getItem("token")
-      if (!token) {
-        console.error("[v0] No token found when creating campaign")
-        setCreateError("Authentication required. Please login again.")
-        return
-      }
-
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL
-      if (!apiUrl) {
-        throw new Error("API URL is not configured. Please set NEXT_PUBLIC_API_URL environment variable.")
-      }
-
       const formDataToSend = new FormData()
       formDataToSend.append("name", formData.name)
       formDataToSend.append("title", formData.title)
@@ -435,42 +366,15 @@ export default function CampaignPage() {
         }
       })
 
-      console.log("[v0] Creating campaign with URL:", `${apiUrl}/admins/banner`)
-      console.log("[v0] Form data:", {
-        name: formData.name,
-        type: formData.type,
-        description: formData.description,
-        note: formData.note,
-        files: Object.entries(files)
-          .filter(([, file]) => file !== null)
-          .map(([key]) => key),
-      })
-
-      const response = await fetch(`${apiUrl}/admins/banner`, {
+      const { ok, data } = await adminFetch("admins/banner", {
         method: "POST",
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
         body: formDataToSend,
+        headers: {},
       })
 
-      console.log("[v0] Response status:", response.status)
-      console.log("[v0] Response headers:", Object.fromEntries(response.headers.entries()))
-
-      if (response.status === 401) {
-        console.error("[v0] Authentication failed when creating campaign - 401 status")
-        setCreateError("Authentication failed. Your session may have expired.")
-        return
+      if (!ok) {
+        throw new Error(`HTTP error! status: ${data?.status || "unknown"}`)
       }
-
-      if (!response.ok) {
-        const errorText = await response.text()
-        console.error("[v0] Error response:", errorText)
-        throw new Error(`HTTP error! status: ${response.status}. ${errorText.substring(0, 200)}`)
-      }
-
-      const data = await parseJsonResponse(response)
-      console.log("[v0] Response data:", data)
 
       if (data.success) {
         setCreateSuccess(true)
@@ -486,7 +390,7 @@ export default function CampaignPage() {
         setCreateError(data.message || "Failed to create campaign")
       }
     } catch (error) {
-      console.error("[v0] Error creating campaign:", error)
+      console.error("Error creating campaign:", error)
       setCreateError(error instanceof Error ? error.message : "Failed to create campaign. Please try again.")
     } finally {
       setCreateLoading(false)
@@ -534,37 +438,13 @@ export default function CampaignPage() {
       setDeleteLoading(true)
       setDeleteError(null)
 
-      const token = localStorage.getItem("token")
-      if (!token) {
-        console.error("[v0] No token found when deleting campaign")
-        setDeleteError("Authentication required. Please login again.")
-        return
-      }
-
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL
-      if (!apiUrl) {
-        throw new Error("API URL is not configured")
-      }
-
-      const response = await fetch(`${apiUrl}/admins/banner/${campaignToDelete.id}`, {
+      const { ok, data } = await adminFetch(`admins/banner/${campaignToDelete.id}`, {
         method: "DELETE",
-        headers: {
-          Authorization: `Bearer ${token}`,
-          "Content-Type": "application/json",
-        },
       })
 
-      if (response.status === 401) {
-        console.error("[v0] Authentication failed when deleting campaign - 401 status")
-        setDeleteError("Authentication failed. Your session may have expired.")
-        return
+      if (!ok) {
+        throw new Error(`HTTP error! status: ${data?.status || "unknown"}`)
       }
-
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`)
-      }
-
-      const data = await parseJsonResponse(response)
 
       if (data.success) {
         setDeleteSuccess(true)
@@ -584,7 +464,7 @@ export default function CampaignPage() {
         }, 5000)
       }
     } catch (error) {
-      console.error("[v0] Error deleting campaign:", error)
+      console.error("Error deleting campaign:", error)
       setDeleteError(error instanceof Error ? error.message : "Failed to delete campaign. Please try again.")
       // Hide error notification after 5 seconds
       setTimeout(() => {
@@ -604,37 +484,11 @@ export default function CampaignPage() {
     setEditError(null)
 
     try {
-      const token = localStorage.getItem("token")
-      if (!token) {
-        console.error("[v0] No token found when fetching campaign for edit")
-        setEditError("Authentication required. Please login again.")
-        return
+      const { ok, data } = await adminFetch(`admins/banner-edit/${campaign.id}`)
+
+      if (!ok) {
+        throw new Error(`HTTP error! status: ${data?.status || "unknown"}`)
       }
-
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL
-      if (!apiUrl) {
-        throw new Error("API URL is not configured")
-      }
-
-      const response = await fetch(`${apiUrl}/admins/banner-edit/${campaign.id}`, {
-        method: "GET",
-        headers: {
-          Authorization: `Bearer ${token}`,
-          "Content-Type": "application/json",
-        },
-      })
-
-      if (response.status === 401) {
-        console.error("[v0] Authentication failed when fetching campaign for edit - 401 status")
-        setEditError("Authentication failed. Your session may have expired.")
-        return
-      }
-
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`)
-      }
-
-      const data = await parseJsonResponse(response)
 
       if (data.success) {
         const campaignData = data.data
@@ -667,7 +521,7 @@ export default function CampaignPage() {
         setEditError(data.message || "Failed to fetch campaign data")
       }
     } catch (error) {
-      console.error("[v0] Error fetching campaign for edit:", error)
+      console.error("Error fetching campaign for edit:", error)
       setEditError(error instanceof Error ? error.message : "Failed to fetch campaign data. Please try again.")
     } finally {
       setEditLoading(false)
@@ -681,18 +535,6 @@ export default function CampaignPage() {
     try {
       setEditLoading(true)
       setEditError(null)
-
-      const token = localStorage.getItem("token")
-      if (!token) {
-        console.error("[v0] No token found when updating campaign")
-        setEditError("Authentication required. Please login again.")
-        return
-      }
-
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL
-      if (!apiUrl) {
-        throw new Error("API URL is not configured")
-      }
 
       const formDataToSend = new FormData()
       formDataToSend.append("_method", "PUT")
@@ -718,25 +560,15 @@ export default function CampaignPage() {
         }
       })
 
-      const response = await fetch(`${apiUrl}/admins/banner/${campaignToEdit.id}`, {
+      const { ok, data } = await adminFetch(`admins/banner/${campaignToEdit.id}`, {
         method: "POST",
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
         body: formDataToSend,
+        headers: {},
       })
 
-      if (response.status === 401) {
-        console.error("[v0] Authentication failed when updating campaign - 401 status")
-        setEditError("Authentication failed. Your session may have expired.")
-        return
+      if (!ok) {
+        throw new Error(`HTTP error! status: ${data?.status || "unknown"}`)
       }
-
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`)
-      }
-
-      const data = await parseJsonResponse(response)
 
       if (data.success) {
         setEditSuccess(true)
@@ -752,7 +584,7 @@ export default function CampaignPage() {
         setEditError(data.message || "Failed to update campaign")
       }
     } catch (error) {
-      console.error("[v0] Error updating campaign:", error)
+      console.error("Error updating campaign:", error)
       setEditError(error instanceof Error ? error.message : "Failed to update campaign. Please try again.")
     } finally {
       setEditLoading(false)

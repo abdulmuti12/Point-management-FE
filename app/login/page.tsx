@@ -88,38 +88,48 @@ export default function LoginPage() {
     fetchLogo()
   }, [])
 
-  /* Auto-redirect if already authenticated */
+  /* Auto-redirect if already authenticated (via BFF /api/bff/me) */
   useEffect(() => {
-    if (localStorage.getItem("token")) router.push("/admin")
-  }, [router])
+    const checkAuth = async () => {
+      try {
+        const res = await fetch("/api/bff/me", { credentials: "same-origin" });
+        const data = await res.json();
+        if (data.authenticated && data.role === "admin") router.push("/admin");
+      } catch {
+        /* stay on login */
+      }
+    };
+    checkAuth();
+  }, [router]);
 
   const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
-    setIsLoading(true)
-    setError("")
+    e.preventDefault();
+    setIsLoading(true);
+    setError("");
 
     try {
-      const res = await fetch(`${API_BASE_URL}/admins/login`, {
+      const res = await fetch("/api/bff/login", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email, password }),
-      })
+        credentials: "same-origin",
+      });
 
-      const data = await res.json()
+      const data = await res.json();
 
       if (res.ok && data.success) {
-        localStorage.setItem("token", data.data.token)
-        localStorage.setItem("user_menus", JSON.stringify(data.data.menus || []))
-        localStorage.setItem("user_name", data.data.name || email.split("@")[0])
-        localStorage.setItem("user_email", data.data.email || email)
-        setTimeout(() => router.push("/admin"), 600)
+        // Store only non-sensitive metadata for UI display (no credentials here)
+        localStorage.setItem("user_menus", JSON.stringify(data.data?.menus || []));
+        localStorage.setItem("user_name", data.data?.name || email.split("@")[0]);
+        localStorage.setItem("user_email", data.data?.email || email);
+        setTimeout(() => router.push("/admin"), 600);
       } else {
-        setError(data.message || "Email atau password salah. Silakan periksa kembali.")
+        setError(data.message || "Email atau password salah. Silakan periksa kembali.");
       }
     } catch {
-      setError("Terjadi kesalahan jaringan. Hubungi admin bila masalah berlanjut.")
+      setError("Terjadi kesalahan jaringan. Hubungi admin bila masalah berlanjut.");
     } finally {
-      setIsLoading(false)
+      setIsLoading(false);
     }
   }
 

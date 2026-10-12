@@ -25,6 +25,7 @@ import {
   Building,
   Globe,
 } from "lucide-react"
+import { adminFetch } from "@/lib/auth"
 
 interface CustomerData {
   id: number
@@ -63,9 +64,6 @@ interface ApiResponse {
   status: number
 }
 
-const API_URL = (process.env.NEXT_PUBLIC_API_URL || "").replace(/\/$/, "")
-const ADMINS_API_BASE_URL = `${API_URL}/admins`
-
 export default function CustomersPage() {
   const [customers, setCustomers] = useState<CustomerData[]>([])
   const [loading, setLoading] = useState(true)
@@ -94,52 +92,19 @@ export default function CustomersPage() {
       setLoading(true)
       setError(null)
 
-      const token = localStorage.getItem("token")
-      if (!token) {
-        // router.push("/login")
-        // return
-      }
-
-      // Build URL with search parameters
-      let url = `${ADMINS_API_BASE_URL}/customer?page=${page}`
+      let endpoint = `admins/customer?page=${page}`
 
       if (search.trim()) {
-        // Add search parameter based on search type
         if (searchType === "all") {
-          url += `&search=${encodeURIComponent(search.trim())}`
+          endpoint += `&search=${encodeURIComponent(search.trim())}`
         } else {
-          url += `&${searchType}=${encodeURIComponent(search.trim())}`
+          endpoint += `&${searchType}=${encodeURIComponent(search.trim())}`
         }
       }
 
-      console.log("Fetching customers from:", url)
-
-      const response = await fetch(url, {
-        method: "GET",
-        headers: {
-          Authorization: `Bearer ${token}`,
-          "Content-Type": "application/json",
-          Accept: "application/json",
-        },
-      })
-
-      console.log("Response status:", response.status)
-
-      if (response.status === 401 || response.status === 400) {
-        localStorage.removeItem("token")
-        router.push("/login")
-        return
-      }
-      if (!response.ok) {
-        setError(`HTTP error! status: ${response.status}`)
-        return
-      }
-
-      const responseData: ApiResponse = await response.json()
-      console.log("Response data:", responseData)
+      const { data: responseData } = await adminFetch(endpoint)
 
       if (!responseData.success) {
-        localStorage.removeItem("token")
         router.push("/login")
         return
       }
@@ -159,9 +124,6 @@ export default function CustomersPage() {
       }
     } catch (error) {
       console.error("Error fetching customers:", error)
-      // On network error (CORS, server down, etc.) clear token and redirect
-      // localStorage.removeItem("token")
-      // router.push("/login")
     } finally {
       setLoading(false)
     }
@@ -201,29 +163,7 @@ export default function CustomersPage() {
     setDetailedCustomerData(null)
 
     try {
-      const token = localStorage.getItem("token")
-      if (!token) {
-        // router.push("/login")
-        // return
-      }
-
-      const response = await fetch(`${ADMINS_API_BASE_URL}/customer/${customer.id}`, {
-        method: "GET",
-        headers: {
-          Authorization: `Bearer ${token}`,
-          "Content-Type": "application/json",
-          Accept: "application/json",
-        },
-      })
-
-      const responseData = await response.json()
-      console.log("Customer detail response:", responseData)
-
-      if (response.status === 401) {
-        localStorage.removeItem("token")
-        // router.push("/login")
-        // return
-      }
+      const { data: responseData } = await adminFetch(`admins/customer/${customer.id}`)
 
       if (responseData.success) {
         setDetailedCustomerData(responseData.data)
@@ -249,23 +189,15 @@ export default function CustomersPage() {
 
     try {
       setEditLoading(true)
-      const token = localStorage.getItem("token")
 
-      const response = await fetch(`${ADMINS_API_BASE_URL}/customer/${selectedCustomer.id}`, {
+      const { ok, data: responseData } = await adminFetch(`admins/customer/${selectedCustomer.id}`, {
         method: "PUT",
-        headers: {
-          Authorization: `Bearer ${token}`,
-          "Content-Type": "application/json",
-          Accept: "application/json",
-        },
         body: JSON.stringify({
           status: editStatus,
         }),
       })
 
-      const responseData = await response.json()
-
-      if (response.ok && responseData.success) {
+      if (ok && responseData.success) {
         setShowEditModal(false)
         setSelectedCustomer(null)
         fetchCustomers(currentPage, searchQuery) // Refresh the list

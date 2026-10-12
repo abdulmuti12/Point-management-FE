@@ -3,7 +3,6 @@
 import type React from "react"
 
 import { useState, useEffect } from "react"
-import { useRouter } from "next/navigation"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -35,20 +34,11 @@ import {
   ImageIcon,
 } from "lucide-react"
 import { Alert, AlertDescription } from "@/components/ui/alert"
+import { adminFetch } from "@/lib/auth"
 import Image from "next/image"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
-
-interface BrandData {
-  id: number
-  name: string
-  note: string | null
-  image: string | null
-  description: string
-  created_at: string
-  updated_at: string
-  link: string // Added link field
-}
+import type { Brand } from "@/lib/types"
 
 interface BrandDetailData {
   general: {
@@ -63,6 +53,13 @@ interface BrandDetailData {
   }
 }
 
+interface ToastNotification {
+  id: string
+  type: "success" | "error"
+  title: string
+  message: string
+}
+
 interface PaginationLink {
   url: string | null
   label: string
@@ -74,7 +71,7 @@ interface ApiResponse {
   message: string
   data: {
     data: {
-      data: BrandData[]
+      data: Brand[]
     }
     meta: {
       current_page: number
@@ -96,15 +93,8 @@ interface ApiResponse {
   status: number
 }
 
-interface ToastNotification {
-  id: string
-  type: "success" | "error"
-  title: string
-  message: string
-}
-
 export default function BrandPage() {
-  const [brands, setBrands] = useState<BrandData[]>([])
+  const [brands, setBrands] = useState<Brand[]>([])
   const [searchValue, setSearchValue] = useState("")
   const [currentPage, setCurrentPage] = useState(1)
   const [totalPages, setTotalPages] = useState(1)
@@ -112,12 +102,11 @@ export default function BrandPage() {
   const [isLoading, setIsLoading] = useState(true)
   const [isSearching, setIsSearching] = useState(false)
   const [isDetailDialogOpen, setIsDetailDialogOpen] = useState(false)
-  const [selectedBrand, setSelectedBrand] = useState<BrandData | null>(null)
+  const [selectedBrand, setSelectedBrand] = useState<Brand | null>(null)
   const [isLoadingDetail, setIsLoadingDetail] = useState(false)
   const [detailError, setDetailError] = useState("")
   const [toasts, setToasts] = useState<ToastNotification[]>([])
   const [apiError, setApiError] = useState("")
-  const router = useRouter()
 
   // Add these state variables after the existing state declarations
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false)
@@ -133,12 +122,12 @@ export default function BrandPage() {
   const [imagePreview, setImagePreview] = useState<string | null>(null)
 
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false)
-  const [brandToDelete, setBrandToDelete] = useState<BrandData | null>(null)
+  const [brandToDelete, setBrandToDelete] = useState<Brand | null>(null)
   const [isDeletingBrand, setIsDeletingBrand] = useState(false)
   const [deleteMessage, setDeleteMessage] = useState("")
 
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false)
-  const [brandToEdit, setBrandToEdit] = useState<BrandData | null>(null)
+  const [brandToEdit, setBrandToEdit] = useState<Brand | null>(null)
   const [isEditingBrand, setIsEditingBrand] = useState(false)
   const [isLoadingEditData, setIsLoadingEditData] = useState(false)
   const [editMessage, setEditMessage] = useState("")
@@ -171,16 +160,6 @@ export default function BrandPage() {
   // Fetch brands data from API
   const fetchBrands = async (page = 1, value = "") => {
     try {
-      const token = localStorage.getItem("token")
-
-      if (!token) {
-        console.error("[v0] No authentication token found in fetchBrands")
-        setApiError("No authentication token found. Please login.")
-        setIsLoading(false)
-        setIsSearching(false)
-        return
-      }
-
       setIsSearching(true)
       setApiError("")
 
@@ -190,42 +169,12 @@ export default function BrandPage() {
         params.append("name", value.trim())
       }
 
-      const url = `${process.env.NEXT_PUBLIC_API_URL}/admins/brand${params.toString() ? `?${params.toString()}` : ""}`
+      const endpoint = `admins/brand${params.toString() ? `?${params.toString()}` : ""}`
 
-      console.log("Fetching brands from:", url)
+      const result = await adminFetch(endpoint)
+      const responseData: any = result.data
 
-      const response = await fetch(url, {
-        method: "GET",
-        headers: {
-          Authorization: `Bearer ${token}`,
-          "Content-Type": "application/json",
-        },
-      })
-
-      console.log("Response status:", response.status)
-
-      if (response.status === 401) {
-        console.error("[v0] 401 Unauthorized in fetchBrands - Token may be expired")
-        setApiError("Authentication failed (401 Unauthorized). Your session may have expired.")
-        localStorage.removeItem("token")
-        // Optional: Uncomment to redirect after 3 seconds
-        // setTimeout(() => router.push("/login"), 3000)
-        return
-      }
-
-      let responseData: any
-      try {
-        responseData = await response.json()
-        console.log("API Response:", responseData)
-      } catch (parseError) {
-        console.error("Failed to parse JSON response:", parseError)
-        setApiError(`Failed to parse server response. Status: ${response.status}`)
-        setBrands([])
-        return
-      }
-
-      if (response.ok) {
-        // Check if response has success field and it's false
+      if (result.ok) {
         if (responseData.success === false) {
           setApiError(responseData.message || "API returned success: false")
           addToast("error", "Error", responseData.message || "Failed to fetch brands")
@@ -236,7 +185,6 @@ export default function BrandPage() {
           return
         }
 
-        // Extract data from the correct structure: data.data.data
         if (
           responseData.data &&
           responseData.data.data &&
@@ -248,21 +196,17 @@ export default function BrandPage() {
           setCurrentPage(responseData.data.meta.current_page)
           setTotalPages(responseData.data.meta.last_page)
           setTotalItems(responseData.data.meta.total)
-          console.log("Brands loaded successfully:", brandsList.length, "brands")
         } else {
-          console.error("Unexpected API response structure:", responseData)
           setApiError(
             `Unexpected data format from server. Expected array of brands but got: ${typeof responseData.data}`,
           )
           setBrands([])
         }
       } else {
-        // Handle error response
-        const errorMessage = responseData?.message || `HTTP ${response.status}: ${response.statusText}`
+        const errorMessage = responseData?.message || `HTTP ${result.status}`
         setApiError(errorMessage)
         addToast("error", "API Error", errorMessage)
         setBrands([])
-        console.error("API Error:", errorMessage)
       }
     } catch (error) {
       console.error("Network error:", error)
@@ -277,7 +221,7 @@ export default function BrandPage() {
   }
 
   // Handle view detail
-  const handleViewDetail = (brand: BrandData) => {
+  const handleViewDetail = (brand: Brand) => {
     setSelectedBrand(brand)
     setIsDetailDialogOpen(true)
   }
@@ -409,18 +353,9 @@ export default function BrandPage() {
   // Add this function to create a new brand
   const createBrand = async () => {
     try {
-      const token = localStorage.getItem("token")
-
-      if (!token) {
-        console.error("[v0] No authentication token found in createBrand")
-        setCreateMessage("Authentication token not found. Please login again.")
-        return
-      }
-
       setIsCreatingBrand(true)
       setCreateMessage("")
 
-      // Create FormData object to handle file upload
       const formData = new FormData()
       formData.append("name", newBrand.name)
       formData.append("description", newBrand.description)
@@ -437,50 +372,31 @@ export default function BrandPage() {
         formData.append("image", brandImage)
       }
 
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/admins/brand`, {
+      const result = await adminFetch("admins/brand", {
         method: "POST",
-        headers: {
-          Authorization: `Bearer ${token}`,
-          // Don't set Content-Type header when using FormData
-          // It will be set automatically with the correct boundary
-        },
+        headers: {},
         body: formData,
       })
 
-      const data = await response.json()
+      const data = result.data
 
-      if (response.status === 401) {
-        console.log(response);
-        console.error("[v0] 401 Unauthorized in createBrand - Token may be expired")
-        setCreateMessage("Authentication failed (401 Unauthorized). Please login again.")
-        // localStorage.removeItem("token")
-        return
-      }
-
-      if (response.ok && data.success) {
-        // Show success toast
+      if (result.ok && data.success) {
         addToast("success", "Brand Created", `Brand "${newBrand.name}" has been successfully created.`)
-
-        // Reset form
         setNewBrand({
           name: "",
           description: "",
           note: "",
-          link: "", // Reset link field
+          link: "",
         })
         setBrandImage(null)
         setImagePreview(null)
-
-        // Refresh brand list
         fetchBrands(currentPage, searchValue)
-
-        // Close dialog after a short delay
         setTimeout(() => {
           setIsAddDialogOpen(false)
           setCreateMessage("")
         }, 2000)
       } else {
-        setCreateMessage(data.message || `Failed to create brand (Status: ${response.status})`)
+        setCreateMessage(data.message || `Failed to create brand (Status: ${result.status})`)
       }
     } catch (error) {
       console.error("Create brand API error:", error)
@@ -501,7 +417,7 @@ export default function BrandPage() {
   }
 
   // Handle delete brand
-  const handleDeleteBrand = (brand: BrandData) => {
+  const handleDeleteBrand = (brand: Brand) => {
     setBrandToDelete(brand)
     setIsDeleteDialogOpen(true)
     setDeleteMessage("")
@@ -512,49 +428,25 @@ export default function BrandPage() {
     if (!brandToDelete) return
 
     try {
-      const token = localStorage.getItem("token")
-
-      if (!token) {
-        console.error("[v0] No authentication token found in deleteBrand")
-        setDeleteMessage("Authentication token not found. Please login again.")
-        return
-      }
-
       setIsDeletingBrand(true)
       setDeleteMessage("")
 
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/admins/brand/${brandToDelete.id}`, {
+      const result = await adminFetch(`admins/brand/${brandToDelete.id}`, {
         method: "DELETE",
-        headers: {
-          Authorization: `Bearer ${token}`,
-          "Content-Type": "application/json",
-        },
       })
 
-      const data = await response.json()
+      const data = result.data
 
-      if (response.status === 401) {
-        console.error("[v0] 401 Unauthorized in deleteBrand - Token may be expired")
-        setDeleteMessage("Authentication failed (401 Unauthorized). Please login again.")
-        localStorage.removeItem("token")
-        return
-      }
-
-      if (response.ok && data.success) {
-        // Show success toast
+      if (result.ok && data.success) {
         addToast("success", "Brand Deleted", `Brand "${brandToDelete.name}" has been successfully deleted.`)
-
-        // Refresh brand list
         fetchBrands(currentPage, searchValue)
-
-        // Close dialog after a short delay
         setTimeout(() => {
           setIsDeleteDialogOpen(false)
           setBrandToDelete(null)
           setDeleteMessage("")
         }, 1500)
       } else {
-        setDeleteMessage(data.message || `Failed to delete brand (Status: ${response.status})`)
+        setDeleteMessage(data.message || `Failed to delete brand (Status: ${result.status})`)
       }
     } catch (error) {
       console.error("Delete brand API error:", error)
@@ -574,51 +466,28 @@ export default function BrandPage() {
   }
 
   // Handle edit brand
-  const handleEditBrand = async (brand: BrandData) => {
+  const handleEditBrand = async (brand: Brand) => {
     setBrandToEdit(brand)
     setIsEditDialogOpen(true)
     setEditMessage("")
     setIsLoadingEditData(true)
 
     try {
-      const token = localStorage.getItem("token")
+      const result = await adminFetch(`admins/brand-edit/${brand.id}`)
+      const data = result.data
 
-      if (!token) {
-        console.error("[v0] No authentication token found in handleEditBrand")
-        setEditMessage("Authentication token not found. Please login again.")
-        return
-      }
-
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/admins/brand-edit/${brand.id}`, {
-        method: "GET",
-        headers: {
-          Authorization: `Bearer ${token}`,
-          "Content-Type": "application/json",
-        },
-      })
-
-      const data = await response.json()
-
-      if (response.status === 401) {
-        console.error("[v0] 401 Unauthorized in handleEditBrand - Token may be expired")
-        setEditMessage("Authentication failed (401 Unauthorized). Please login again.")
-        localStorage.removeItem("token")
-        return
-      }
-
-      if (response.ok && data.success) {
-        // Populate form with existing data
+      if (result.ok && data.success) {
         setEditBrand({
           name: data.data.name || "",
           description: data.data.description || "",
           note: data.data.note || "",
-          link: data.data.link || "", // Added link field to editBrand state
+          link: data.data.link || "",
         })
         setCurrentBrandImage(data.data.image)
         setEditImagePreview(null)
         setEditBrandImage(null)
       } else {
-        setEditMessage(data.message || `Failed to load brand data (Status: ${response.status})`)
+        setEditMessage(data.message || `Failed to load brand data (Status: ${result.status})`)
       }
     } catch (error) {
       console.error("Load brand data API error:", error)
@@ -668,18 +537,9 @@ export default function BrandPage() {
     if (!brandToEdit) return
 
     try {
-      const token = localStorage.getItem("token")
-
-      if (!token) {
-        console.error("[v0] No authentication token found in updateBrand")
-        setEditMessage("Authentication token not found. Please login again.")
-        return
-      }
-
       setIsEditingBrand(true)
       setEditMessage("")
 
-      // Create FormData object to handle file upload
       const formData = new FormData()
       formData.append("name", editBrand.name)
       formData.append("description", editBrand.description)
@@ -697,39 +557,24 @@ export default function BrandPage() {
         formData.append("image", editBrandImage)
       }
 
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/admins/brand/${brandToEdit.id}`, {
+      const result = await adminFetch(`admins/brand/${brandToEdit.id}`, {
         method: "POST",
-        headers: {
-          Authorization: `Bearer ${token}`,
-          // Don't set Content-Type header when using FormData
-        },
+        headers: {},
         body: formData,
       })
 
-      const data = await response.json()
+      const data = result.data
 
-      if (response.status === 401) {
-        console.error("[v0] 401 Unauthorized in updateBrand - Token may be expired")
-        setEditMessage("Authentication failed (401 Unauthorized). Please login again.")
-        localStorage.removeItem("token")
-        return
-      }
-
-      if (response.ok && data.success) {
-        // Show success toast
+      if (result.ok && data.success) {
         addToast("success", "Brand Updated", `Brand "${editBrand.name}" has been successfully updated.`)
-
-        // Refresh brand list
         fetchBrands(currentPage, searchValue)
-
-        // Close dialog after a short delay
         setTimeout(() => {
           setIsEditDialogOpen(false)
           setBrandToEdit(null)
           setEditMessage("")
         }, 2000)
       } else {
-        setEditMessage(data.message || `Failed to update brand (Status: ${response.status})`)
+        setEditMessage(data.message || `Failed to update brand (Status: ${result.status})`)
       }
     } catch (error) {
       console.error("Update brand API error:", error)

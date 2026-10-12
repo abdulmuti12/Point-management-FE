@@ -35,6 +35,7 @@ import {
   Coins,
 } from "lucide-react"
 import { Alert, AlertDescription } from "@/components/ui/alert"
+import { adminFetch } from "@/lib/auth"
 import Image from "next/image"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
@@ -150,15 +151,6 @@ export default function GiftPage() {
 
   const fetchGifts = async (page = 1, value = "") => {
     try {
-      const token = localStorage.getItem("token")
-
-      if (!token) {
-        setApiError("No authentication token found. Please login.")
-        setIsLoading(false)
-        setIsSearching(false)
-        return
-      }
-
       setIsSearching(true)
       setApiError("")
 
@@ -168,45 +160,20 @@ export default function GiftPage() {
         params.append("name", value.trim())
       }
 
-      const url = `${process.env.NEXT_PUBLIC_API_URL}/admins/gift${params.toString() ? `?${params.toString()}` : ""}`
+      const { ok, data: responseData } = await adminFetch(`admins/gift${params.toString() ? `?${params.toString()}` : ""}`)
 
-      const response = await fetch(url, {
-        method: "GET",
-        headers: {
-          Authorization: `Bearer ${token}`,
-          "Content-Type": "application/json",
-        },
-      })
-
-      if (response.status === 401) {
-        setApiError("Authentication failed (401 Unauthorized). Your session may have expired.")
-        localStorage.removeItem("token")
-        return
-      }
-
-      let responseData: any
-      try {
-        responseData = await response.json()
-      } catch (parseError) {
-        setApiError(`Failed to parse server response. Status: ${response.status}`)
+      if (responseData.success === false) {
+        setApiError(responseData.message || "API returned success: false")
+        addToast("error", "Error", responseData.message || "Failed to fetch gifts")
         setGifts([])
+        setCurrentPage(1)
+        setTotalPages(1)
+        setTotalItems(0)
         return
       }
 
-      if (response.ok) {
-        if (responseData.success === false) {
-          setApiError(responseData.message || "API returned success: false")
-          addToast("error", "Error", responseData.message || "Failed to fetch gifts")
-          setGifts([])
-          setCurrentPage(1)
-          setTotalPages(1)
-          setTotalItems(0)
-          return
-        }
-
+      if (ok) {
         if (responseData.data && responseData.data.data) {
-          // Backend wraps data: response.data.data = { data: [...], meta, links }
-          // Handle both nested ({data: {data: [...]}}) and flat ({data: [...]})
           const payload = responseData.data.data
           const giftsList = Array.isArray(payload) ? payload : payload.data || []
           const meta = payload.meta || {}
@@ -219,7 +186,7 @@ export default function GiftPage() {
           setGifts([])
         }
       } else {
-        const errorMessage = responseData?.message || `HTTP ${response.status}: ${response.statusText}`
+        const errorMessage = responseData?.message || "Request failed"
         setApiError(errorMessage)
         addToast("error", "API Error", errorMessage)
         setGifts([])
@@ -356,13 +323,6 @@ export default function GiftPage() {
 
   const createGift = async () => {
     try {
-      const token = localStorage.getItem("token")
-
-      if (!token) {
-        setCreateMessage("Authentication token not found. Please login again.")
-        return
-      }
-
       setIsCreatingGift(true)
       setCreateMessage("")
 
@@ -379,22 +339,13 @@ export default function GiftPage() {
         formData.append("image", giftImage)
       }
 
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/admins/gift`, {
+      const { ok, data } = await adminFetch("admins/gift", {
         method: "POST",
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
         body: formData,
+        headers: {},
       })
 
-      const data = await response.json()
-
-      if (response.status === 401) {
-        setCreateMessage("Authentication failed (401 Unauthorized). Please login again.")
-        return
-      }
-
-      if (response.ok && data.success) {
+      if (ok && data.success) {
         addToast("success", "Gift Created", `Gift "${newGift.name}" has been successfully created.`)
 
         setNewGift({
@@ -413,7 +364,7 @@ export default function GiftPage() {
           setCreateMessage("")
         }, 2000)
       } else {
-        setCreateMessage(data.message || `Failed to create gift (Status: ${response.status})`)
+        setCreateMessage(data.message || "Failed to create gift")
       }
     } catch (error) {
       setCreateMessage("Network error occurred while creating gift")
@@ -444,33 +395,14 @@ export default function GiftPage() {
     if (!giftToDelete) return
 
     try {
-      const token = localStorage.getItem("token")
-
-      if (!token) {
-        setDeleteMessage("Authentication token not found. Please login again.")
-        return
-      }
-
       setIsDeletingGift(true)
       setDeleteMessage("")
 
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/admins/gift/${giftToDelete.id}`, {
+      const { ok, data } = await adminFetch(`admins/gift/${giftToDelete.id}`, {
         method: "DELETE",
-        headers: {
-          Authorization: `Bearer ${token}`,
-          "Content-Type": "application/json",
-        },
       })
 
-      const data = await response.json()
-
-      if (response.status === 401) {
-        setDeleteMessage("Authentication failed (401 Unauthorized). Please login again.")
-        localStorage.removeItem("token")
-        return
-      }
-
-      if (response.ok && data.success) {
+      if (ok && data.success) {
         addToast("success", "Gift Deleted", `Gift "${giftToDelete.name}" has been successfully deleted.`)
 
         fetchGifts(currentPage, searchValue)
@@ -481,7 +413,7 @@ export default function GiftPage() {
           setDeleteMessage("")
         }, 1500)
       } else {
-        setDeleteMessage(data.message || `Failed to delete gift (Status: ${response.status})`)
+        setDeleteMessage(data.message || "Failed to delete gift")
       }
     } catch (error) {
       setDeleteMessage("Network error occurred while deleting gift")
@@ -505,30 +437,9 @@ export default function GiftPage() {
     setIsLoadingEditData(true)
 
     try {
-      const token = localStorage.getItem("token")
+      const { ok, data } = await adminFetch(`admins/gift-edit/${gift.id}`)
 
-      if (!token) {
-        setEditMessage("Authentication token not found. Please login again.")
-        return
-      }
-
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/admins/gift-edit/${gift.id}`, {
-        method: "GET",
-        headers: {
-          Authorization: `Bearer ${token}`,
-          "Content-Type": "application/json",
-        },
-      })
-
-      const data = await response.json()
-
-      if (response.status === 401) {
-        setEditMessage("Authentication failed (401 Unauthorized). Please login again.")
-        localStorage.removeItem("token")
-        return
-      }
-
-      if (response.ok && data.success) {
+      if (ok && data.success) {
         setEditGift({
           name: data.data.name || "",
           total_point: String(data.data.total_point ?? ""),
@@ -539,7 +450,7 @@ export default function GiftPage() {
         setEditImagePreview(null)
         setEditGiftImage(null)
       } else {
-        setEditMessage(data.message || `Failed to load gift data (Status: ${response.status})`)
+        setEditMessage(data.message || "Failed to load gift data")
       }
     } catch (error) {
       setEditMessage("Network error occurred while loading gift data")
@@ -584,13 +495,6 @@ export default function GiftPage() {
     if (!giftToEdit) return
 
     try {
-      const token = localStorage.getItem("token")
-
-      if (!token) {
-        setEditMessage("Authentication token not found. Please login again.")
-        return
-      }
-
       setIsEditingGift(true)
       setEditMessage("")
 
@@ -608,22 +512,13 @@ export default function GiftPage() {
         formData.append("image", editGiftImage)
       }
 
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/admins/gift/${giftToEdit.id}`, {
+      const { ok, data } = await adminFetch(`admins/gift/${giftToEdit.id}`, {
         method: "POST",
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
         body: formData,
+        headers: {},
       })
 
-      const data = await response.json()
-
-      if (response.status === 401) {
-        setEditMessage("Authentication failed (401 Unauthorized). Please login again.")
-        return
-      }
-
-      if (response.ok && data.success) {
+      if (ok && data.success) {
         addToast("success", "Gift Updated", `Gift "${editGift.name}" has been successfully updated.`)
 
         fetchGifts(currentPage, searchValue)
@@ -634,7 +529,7 @@ export default function GiftPage() {
           setEditMessage("")
         }, 2000)
       } else {
-        setEditMessage(data.message || `Failed to update gift (Status: ${response.status})`)
+        setEditMessage(data.message || "Failed to update gift")
       }
     } catch (error) {
       setEditMessage("Network error occurred while updating gift")

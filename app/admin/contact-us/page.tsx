@@ -32,9 +32,9 @@ import {
 import { Separator } from "@/components/ui/separator"
 import { useSearchParams } from "next/navigation"
 import { Suspense } from "react"
+import { adminFetch } from "@/lib/auth"
 
 // Define API base URL using environment variables
-const API_BASE_URL = `${(process.env.NEXT_PUBLIC_API_URL || "").replace(/\/$/, "")}/admins`
 
 interface ContactUs {
   id: number
@@ -121,25 +121,12 @@ export default function ContactUsPage() {
     setError(null)
 
     try {
-      const token = localStorage.getItem("token")
-      if (!token) {
-        setError("Authentication required. Please login.")
-        setLoading(false)
-        setIsSearching(false)
-        return
-      }
+      const params = new URLSearchParams()
+      params.append("page", String(page))
+      if (name) params.append("name", name)
 
-      let url = `${API_BASE_URL}/contact-us?page=${page}`
-      if (name) url += `&name=${encodeURIComponent(name)}`
-
-      const response = await fetch(url, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-          "Content-Type": "application/json",
-        },
-      })
-
-      const data: ContactUsResponse = await response.json()
+      const result = await adminFetch(`admins/contact-us?${params.toString()}`)
+      const data: ContactUsResponse = result.data
 
       if (data.success) {
         setContacts(data.data.data.data)
@@ -207,46 +194,20 @@ export default function ContactUsPage() {
     setDetailLoading(true)
 
     try {
-      const token = localStorage.getItem("token")
-      if (!token) {
-        setDetailError("Authentication required. Please login.")
-        setDetailLoading(false)
-        return
-      }
+      const result = await adminFetch(`admins/contact-us/${contact.id}`)
+      const data = result.data
 
-      const url = `${API_BASE_URL}/contact-us/${contact.id}`
-
-      const response = await fetch(url, {
-        method: "GET",
-        headers: {
-          Authorization: `Bearer ${token}`,
-          "Content-Type": "application/json",
-        },
-      })
-
-      if (!response.ok) {
-        const errorData = await response.json()
-        setDetailError(errorData.message || `Failed to load contact details (${response.status})`)
-        setDetailLoading(false)
-        return
-      }
-
-      const data = await response.json()
-
-    console.log("DETAIL RESPONSE:", data)
-
-     if (data.success && data.data && data.data.general) {
+      if (result.ok && data.success && data.data && data.data.general) {
         setSelectedContact(data.data.general)
       } else {
-        setDetailError(data.message || "Failed to load product details")
+        setDetailError(data.message || "Failed to load contact details")
       }
     } catch (err) {
-      console.error("Error fetching contact us details:", err)
       setDetailError("Failed to fetch contact us details. Please try again.")
     } finally {
       setDetailLoading(false)
     }
-    }
+  }
   // Delete contact
   const deleteContact = async () => {
     if (!contactToDelete) return
@@ -254,29 +215,11 @@ export default function ContactUsPage() {
     setDeleteLoading(true)
 
     try {
-      const token = localStorage.getItem("token")
-      if (!token) {
-        setNotification({
-          show: true,
-          message: "Authentication required. Please login.",
-          type: "error",
-        })
-        setTimeout(() => {
-          setNotification((prev) => ({ ...prev, show: false }))
-        }, 3000)
-        setDeleteLoading(false)
-        return
-      }
-
-      const response = await fetch(`${API_BASE_URL}/contact-us/${contactToDelete.id}`, {
+      const result = await adminFetch(`admins/contact-us/${contactToDelete.id}`, {
         method: "DELETE",
-        headers: {
-          Authorization: `Bearer ${token}`,
-          "Content-Type": "application/json",
-        },
       })
 
-      const data = await response.json()
+      const data = result.data
 
       if (data.success) {
         setDeleteDialogOpen(false)

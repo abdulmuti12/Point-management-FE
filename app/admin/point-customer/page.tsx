@@ -22,6 +22,7 @@ import {
   History,
 } from "lucide-react"
 import { Alert, AlertDescription } from "@/components/ui/alert"
+import { adminFetch, logoutAdmin } from "@/lib/auth"
 
 interface PointCustomer {
   id: string
@@ -124,15 +125,6 @@ export default function PointCustomerPage() {
   // Fetch data
   const fetchPointCustomers = async (page = 1, value = "") => {
     try {
-      const token = localStorage.getItem("token")
-
-      if (!token) {
-        setApiError("No authentication token found. Please login.")
-        setIsLoading(false)
-        setIsSearching(false)
-        return
-      }
-
       setIsSearching(true)
       setApiError("")
 
@@ -142,34 +134,12 @@ export default function PointCustomerPage() {
         params.append("search", value.trim())
       }
 
-      const apiBase = (process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000/api").replace(/\/$/, "")
-      const url = `${apiBase}/admins/redeem-point${params.toString() ? `?${params.toString()}` : ""}`
+      const endpoint = `admins/redeem-point${params.toString() ? `?${params.toString()}` : ""}`
 
-      const response = await fetch(url, {
-        method: "GET",
-        headers: {
-          Authorization: `Bearer ${token}`,
-          "Content-Type": "application/json",
-        },
-      })
+      const result = await adminFetch(endpoint)
+      const responseData: ApiResponse | any = result.data
 
-      if (response.status === 401) {
-        localStorage.removeItem("token")
-        router.push("/login")
-        return
-      }
-
-      let responseData: ApiResponse | any
-      try {
-        responseData = await response.json()
-      } catch (parseError) {
-        setApiError(`Failed to parse server response. Status: ${response.status}`)
-        setPointCustomers([])
-        return
-      }
-
-      if (response.ok) {
-        // The endpoint nests pagination data inside data.data (extra level)
+      if (result.ok) {
         const container = responseData?.data?.data
         const records: PointCustomer[] = container?.data ?? []
         const meta = container?.meta
@@ -180,12 +150,13 @@ export default function PointCustomerPage() {
         setTotalItems(meta?.total || records.length)
         setPerPage(meta?.per_page || 10)
       } else {
-        setApiError(responseData?.message || `Failed to fetch data. Status: ${response.status}`)
+        setApiError(responseData?.message || `Failed to fetch data. Status: ${result.status}`)
         setPointCustomers([])
       }
     } catch (err) {
       console.error("Fetch error:", err)
-      setApiError("Network error. Please check your connection and try again.")
+      await logoutAdmin()
+      router.push("/login")
       setPointCustomers([])
     } finally {
       setIsLoading(false)

@@ -9,6 +9,7 @@ import {
   LogOut,
   X,
 } from "lucide-react"
+import { logoutCustomer } from "@/lib/auth"
 
 const NAV_ITEMS = [
   { label: "Account", icon: User, href: "/customer/account" },
@@ -31,10 +32,8 @@ export function CustomerSidebar({
   const pathname = usePathname()
   const router = useRouter()
 
-  const handleLogout = () => {
-    localStorage.removeItem("customer_token")
-    localStorage.removeItem("customer_name")
-    localStorage.removeItem("customer_email")
+  const handleLogout = async () => {
+    await logoutCustomer()
     router.push("/customer/login")
   }
 

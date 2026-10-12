@@ -8,28 +8,28 @@ export default function HomePage() {
   const router = useRouter()
 
   useEffect(() => {
-    const checkAuth = () => {
+    const checkAuth = async () => {
       try {
-        const adminToken = localStorage.getItem("token")
-        const customerToken = localStorage.getItem("customer_token")
+        const res = await fetch("/api/bff/me", { credentials: "same-origin" });
+        const data = await res.json();
 
-        if (customerToken) {
-          router.push("/customer")
-        } else if (adminToken) {
-          router.push("/admin")
+        if (data.authenticated && data.role === "customer") {
+          router.push("/customer");
+        } else if (data.authenticated && data.role === "admin") {
+          router.push("/admin");
         } else {
-          router.push("/customer/login")
+          router.push("/customer/login");
         }
       } catch (error) {
-        console.error("Auth check error:", error)
-        router.push("/customer/login")
+        console.error("Auth check error:", error);
+        router.push("/customer/login");
       } finally {
-        setIsLoading(false)
+        setIsLoading(false);
       }
-    }
+    };
 
-    checkAuth()
-  }, [router])
+    checkAuth();
+  }, [router]);
 
   if (isLoading) {
     return (

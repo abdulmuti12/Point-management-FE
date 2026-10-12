@@ -3,7 +3,6 @@
 import type React from "react"
 
 import { useState, useEffect } from "react"
-import { useRouter } from "next/navigation"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -34,6 +33,7 @@ import {
   FolderOpen,
 } from "lucide-react"
 import { Alert, AlertDescription } from "@/components/ui/alert"
+import { adminFetch } from "@/lib/auth"
 import Image from "next/image"
 import { Label } from "@/components/ui/label"
 
@@ -107,7 +107,6 @@ export default function CategoryPage() {
   const [detailError, setDetailError] = useState("")
   const [toasts, setToasts] = useState<ToastNotification[]>([])
   const [apiError, setApiError] = useState("")
-  const router = useRouter()
 
   // Add these state variables after the existing state declarations
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false)
@@ -136,9 +135,6 @@ export default function CategoryPage() {
   const [editImagePreview, setEditImagePreview] = useState<string | null>(null)
   const [currentCategoryImage, setCurrentCategoryImage] = useState<string | null>(null)
 
-  const API_BASE_URL = (process.env.NEXT_PUBLIC_API_URL || "").replace(/\/$/, "")
-
-
 
   // Toast notification functions
   const addToast = (type: "success" | "error", title: string, message: string) => {
@@ -159,15 +155,6 @@ export default function CategoryPage() {
   // Fetch categories data from API
   const fetchCategories = async (page = 1, value = "") => {
     try {
-      const token = localStorage.getItem("token")
-
-      if (!token) {
-        setApiError("No authentication token found. Please login.")
-        setIsLoading(false)
-        setIsSearching(false)
-        return
-      }
-
       setIsSearching(true)
       setApiError("")
 
@@ -177,42 +164,12 @@ export default function CategoryPage() {
         params.append("name", value.trim())
       }
 
-      const url = `${API_BASE_URL}/admins/category${params.toString() ? `?${params.toString()}` : ""}`
+      const endpoint = `admins/category${params.toString() ? `?${params.toString()}` : ""}`
 
+      const result = await adminFetch(endpoint)
+      const responseData: any = result.data
 
-      console.log("Fetching categories from:", url)
-
-      const response = await fetch(url, {
-        method: "GET",
-        headers: {
-          Authorization: `Bearer ${token}`,
-          "Content-Type": "application/json",
-        },
-      })
-
-      console.log("Response status:", response.status)
-
-      // Only redirect to login if we get a 401 Unauthorized
-      if (response.status === 401) {
-        console.log("Unauthorized access, redirecting to login")
-        localStorage.removeItem("token")
-        router.push("/login")
-        return
-      }
-
-      let responseData: any
-      try {
-        responseData = await response.json()
-        console.log("API Response:", responseData)
-      } catch (parseError) {
-        console.error("Failed to parse JSON response:", parseError)
-        setApiError(`Failed to parse server response. Status: ${response.status}`)
-        setCategories([])
-        return
-      }
-
-      if (response.ok) {
-        // Check if response has success field and it's false
+      if (result.ok) {
         if (responseData.success === false) {
           setApiError(responseData.message || "API returned success: false")
           addToast("error", "Error", responseData.message || "Failed to fetch categories")
@@ -223,7 +180,6 @@ export default function CategoryPage() {
           return
         }
 
-        // Extract data from the correct structure: data.data.data
         if (
           responseData.data &&
           responseData.data.data &&
@@ -235,21 +191,17 @@ export default function CategoryPage() {
           setCurrentPage(responseData.data.meta.current_page)
           setTotalPages(responseData.data.meta.last_page)
           setTotalItems(responseData.data.meta.total)
-          console.log("Categories loaded successfully:", categoriesList.length, "categories")
         } else {
-          console.error("Unexpected API response structure:", responseData)
           setApiError(
             `Unexpected data format from server. Expected array of categories but got: ${typeof responseData.data}`,
           )
           setCategories([])
         }
       } else {
-        // Handle error response
-        const errorMessage = responseData?.message || `HTTP ${response.status}: ${response.statusText}`
+        const errorMessage = responseData?.message || `HTTP ${result.status}`
         setApiError(errorMessage)
         addToast("error", "API Error", errorMessage)
         setCategories([])
-        console.error("API Error:", errorMessage)
       }
     } catch (error) {
       console.error("Network error:", error)
@@ -397,18 +349,9 @@ export default function CategoryPage() {
   // Add this function to create a new category
   const createCategory = async () => {
     try {
-      const token = localStorage.getItem("token")
-
-      if (!token) {
-        setCreateMessage("Authentication token not found. Please login again.")
-        router.push("/login")
-        return
-      }
-
       setIsCreatingCategory(true)
       setCreateMessage("")
 
-      // Create FormData object to handle file upload
       const formData = new FormData()
       formData.append("name", newCategory.name)
 
@@ -416,46 +359,28 @@ export default function CategoryPage() {
         formData.append("image", categoryImage)
       }
 
-      const response = await fetch(`${API_BASE_URL}/admins/category`, {
+      const result = await adminFetch("admins/category", {
         method: "POST",
-        headers: {
-          Authorization: `Bearer ${token}`,
-          // Don't set Content-Type header when using FormData
-          // It will be set automatically with the correct boundary
-        },
+        headers: {},
         body: formData,
       })
 
-      const data = await response.json()
+      const data = result.data
 
-      if (response.status === 401) {
-        setCreateMessage("Authentication failed. Please login again.")
-        localStorage.removeItem("token")
-        router.push("/login")
-        return
-      }
-
-      if (response.ok && data.success) {
-        // Show success toast
+      if (result.ok && data.success) {
         addToast("success", "Category Created", `Category "${newCategory.name}" has been successfully created.`)
-
-        // Reset form
         setNewCategory({
           name: "",
         })
         setCategoryImage(null)
         setImagePreview(null)
-
-        // Refresh category list
         fetchCategories(currentPage, searchValue)
-
-        // Close dialog after a short delay
         setTimeout(() => {
           setIsAddDialogOpen(false)
           setCreateMessage("")
         }, 2000)
       } else {
-        setCreateMessage(data.message || `Failed to create category (Status: ${response.status})`)
+        setCreateMessage(data.message || `Failed to create category (Status: ${result.status})`)
       }
     } catch (error) {
       console.error("Create category API error:", error)
@@ -487,49 +412,25 @@ export default function CategoryPage() {
     if (!categoryToDelete) return
 
     try {
-      const token = localStorage.getItem("token")
-
-      if (!token) {
-        setDeleteMessage("Authentication token not found. Please login again.")
-        router.push("/login")
-        return
-      }
-
       setIsDeletingCategory(true)
       setDeleteMessage("")
 
-      const response = await fetch(`${API_BASE_URL}/admins/category/${categoryToDelete.id}`, {
+      const result = await adminFetch(`admins/category/${categoryToDelete.id}`, {
         method: "DELETE",
-        headers: {
-          Authorization: `Bearer ${token}`,
-          "Content-Type": "application/json",
-        },
       })
 
-      const data = await response.json()
+      const data = result.data
 
-      if (response.status === 401) {
-        setDeleteMessage("Authentication failed. Please login again.")
-        localStorage.removeItem("token")
-        router.push("/login")
-        return
-      }
-
-      if (response.ok && data.success) {
-        // Show success toast
+      if (result.ok && data.success) {
         addToast("success", "Category Deleted", `Category "${categoryToDelete.name}" has been successfully deleted.`)
-
-        // Refresh category list
         fetchCategories(currentPage, searchValue)
-
-        // Close dialog after a short delay
         setTimeout(() => {
           setIsDeleteDialogOpen(false)
           setCategoryToDelete(null)
           setDeleteMessage("")
         }, 1500)
       } else {
-        setDeleteMessage(data.message || `Failed to delete category (Status: ${response.status})`)
+        setDeleteMessage(data.message || `Failed to delete category (Status: ${result.status})`)
       }
     } catch (error) {
       console.error("Delete category API error:", error)
@@ -556,16 +457,6 @@ export default function CategoryPage() {
     setIsLoadingEditData(true)
 
     try {
-      const token = localStorage.getItem("token")
-
-      if (!token) {
-        setEditMessage("Authentication token not found. Please login again.")
-        router.push("/login")
-        return
-      }
-
-      // For now, we'll use the existing data since there's no specific edit endpoint mentioned
-      // Populate form with existing data
       setEditCategory({
         name: category.name || "",
       })
@@ -617,18 +508,9 @@ export default function CategoryPage() {
     if (!categoryToEdit) return
 
     try {
-      const token = localStorage.getItem("token")
-
-      if (!token) {
-        setEditMessage("Authentication token not found. Please login again.")
-        router.push("/login")
-        return
-      }
-
       setIsEditingCategory(true)
       setEditMessage("")
 
-      // Create FormData object to handle file upload
       const formData = new FormData()
       formData.append("name", editCategory.name)
       formData.append("_method", "PUT")
@@ -637,39 +519,24 @@ export default function CategoryPage() {
         formData.append("image", editCategoryImage)
       }
 
-      const response = await fetch(`${API_BASE_URL}/admins/category/${categoryToEdit.id}`, {
+      const result = await adminFetch(`admins/category/${categoryToEdit.id}`, {
         method: "POST",
-        headers: {
-          Authorization: `Bearer ${token}`,
-          // Don't set Content-Type header when using FormData
-        },
+        headers: {},
         body: formData,
       })
 
-      const data = await response.json()
+      const data = result.data
 
-      if (response.status === 401) {
-        setEditMessage("Authentication failed. Please login again.")
-        localStorage.removeItem("token")
-        router.push("/login")
-        return
-      }
-
-      if (response.ok && data.success) {
-        // Show success toast
+      if (result.ok && data.success) {
         addToast("success", "Category Updated", `Category "${editCategory.name}" has been successfully updated.`)
-
-        // Refresh category list
         fetchCategories(currentPage, searchValue)
-
-        // Close dialog after a short delay
         setTimeout(() => {
           setIsEditDialogOpen(false)
           setCategoryToEdit(null)
           setEditMessage("")
         }, 2000)
       } else {
-        setEditMessage(data.message || `Failed to update category (Status: ${response.status})`)
+        setEditMessage(data.message || `Failed to update category (Status: ${result.status})`)
       }
     } catch (error) {
       console.error("Update category API error:", error)

@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
+import { adminFetch, logoutAdmin } from "@/lib/auth"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -181,13 +182,6 @@ export default function AdminPage() {
   // Fetch admins data from API
   const fetchAdmins = async (page = 1, type: "name" | "email" = "name", value = "") => {
     try {
-      const token = localStorage.getItem("token")
-
-      if (!token) {
-        router.push("/login")
-        return
-      }
-
       setIsSearching(true)
 
       const params = new URLSearchParams()
@@ -196,32 +190,22 @@ export default function AdminPage() {
         params.append(type, value.trim())
       }
 
-      const url = `${process.env.NEXT_PUBLIC_API_URL}/admins/admin${params.toString() ? `?${params.toString()}` : ""}`
+      const endpoint = `admins/admin${params.toString() ? `?${params.toString()}` : ""}`
 
-      const response = await fetch(url, {
-        method: "GET",
-        headers: {
-          Authorization: `Bearer ${token}`,
-          "Content-Type": "application/json",
-        },
-      })
+      const { ok, data } = await adminFetch(endpoint)
 
-      const data: ApiResponse = await response.json()
-
-      if (response.ok && data.success) {
+      if (ok && data.success) {
         setAdmins(data.data.data)
         setCurrentPage(data.data.current_page)
         setTotalPages(data.data.last_page)
         setTotalItems(data.data.total)
       } else {
-        // If API returns success: false, redirect to login
-        localStorage.removeItem("token")
+        await logoutAdmin()
         router.push("/login")
       }
     } catch (error) {
       console.error("Admin API error:", error)
-      // On network error, redirect to login
-      localStorage.removeItem("token")
+      await logoutAdmin()
       router.push("/login")
     } finally {
       setIsLoading(false)
@@ -232,27 +216,12 @@ export default function AdminPage() {
   // Fetch roles data from API
   const fetchRoles = async () => {
     try {
-      const token = localStorage.getItem("token")
-
-      if (!token) {
-        router.push("/login")
-        return
-      }
-
       setIsLoadingRoles(true)
       setRoleError("")
 
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/admins/get-role`, {
-        method: "GET",
-        headers: {
-          Authorization: `Bearer ${token}`,
-          "Content-Type": "application/json",
-        },
-      })
+      const { ok, data } = await adminFetch("admins/get-role")
 
-      const data: RoleApiResponse = await response.json()
-
-      if (response.ok && data.success) {
+      if (ok && data.success) {
         setRoles(data.data)
       } else {
         setRoleError(data.message || "Failed to load roles")
@@ -268,28 +237,13 @@ export default function AdminPage() {
   // Fetch admin detail
   const fetchAdminDetail = async (adminId: number) => {
     try {
-      const token = localStorage.getItem("token")
-
-      if (!token) {
-        router.push("/login")
-        return
-      }
-
       setIsLoadingDetail(true)
       setDetailError("")
       setAdminDetail(null)
 
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/admins/admin/${adminId}`, {
-        method: "GET",
-        headers: {
-          Authorization: `Bearer ${token}`,
-          "Content-Type": "application/json",
-        },
-      })
+      const { ok, data } = await adminFetch(`admins/admin/${adminId}`)
 
-      const data: DetailApiResponse = await response.json()
-
-      if (response.ok && data.success) {
+      if (ok && data.success) {
         setAdminDetail(data.data)
       } else {
         setDetailError(data.message || "Failed to load admin details")
@@ -305,34 +259,11 @@ export default function AdminPage() {
   // Create new admin
   const createAdmin = async () => {
     try {
-      const token = localStorage.getItem("token")
-
-      if (!token) {
-        setCreateMessage("Authentication token not found. Please login again.")
-        router.push("/login")
-        return
-      }
-
       setIsCreatingAdmin(true)
       setCreateMessage("")
 
-      // Debug: Log the request details
-      console.log("Creating admin with token:", token ? "Token exists" : "No token")
-      console.log("Request payload:", {
-        name: newAdmin.name,
-        email: newAdmin.email,
-        status: newAdmin.status,
-        password: newAdmin.password,
-        role_id: Number.parseInt(newAdmin.role_id),
-      })
-
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/admins/admin`, {
+      const { ok, status, data } = await adminFetch("admins/admin", {
         method: "POST",
-        headers: {
-          Authorization: `Bearer ${token}`,
-          "Content-Type": "application/json",
-          Accept: "application/json",
-        },
         body: JSON.stringify({
           name: newAdmin.name,
           email: newAdmin.email,
@@ -342,23 +273,8 @@ export default function AdminPage() {
         }),
       })
 
-      // Debug: Log response details
-      console.log("Response status:", response.status)
-      console.log("Response headers:", response.headers)
-
-      const data: CreateAdminResponse = await response.json()
-      console.log("Response data:", data)
-
-      if (response.status === 401) {
-        setCreateMessage("Authentication failed. Please login again.")
-        localStorage.removeItem("token")
-        router.push("/login")
-        return
-      }
-
-      if (response.ok && data.success) {
+      if (ok && data.success) {
         setCreateMessage("Admin created successfully!")
-        // Reset form
         setNewAdmin({
           name: "",
           email: "",
@@ -366,15 +282,13 @@ export default function AdminPage() {
           role_id: "",
           status: "Active",
         })
-        // Refresh admin list
         fetchAdmins(currentPage, searchType, searchValue)
-        // Close dialog after a short delay
         setTimeout(() => {
           setIsAddDialogOpen(false)
           setCreateMessage("")
         }, 2000)
       } else {
-        setCreateMessage(data.message || `Failed to create admin (Status: ${response.status})`)
+        setCreateMessage(data.message || `Failed to create admin (Status: ${status})`)
       }
     } catch (error) {
       console.error("Create admin API error:", error)
@@ -487,14 +401,6 @@ export default function AdminPage() {
   // Update admin
   const updateAdmin = async (adminId: number) => {
     try {
-      const token = localStorage.getItem("token")
-
-      if (!token) {
-        setEditMessage("Authentication token not found. Please login again.")
-        router.push("/login")
-        return
-      }
-
       setIsEditingAdmin(true)
       setEditMessage("")
 
@@ -503,44 +409,29 @@ export default function AdminPage() {
         return
       }
 
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/admins/admin/${adminId}`, {
+      const result = await adminFetch(`admins/admin/${adminId}`, {
         method: "PUT",
-        headers: {
-          Authorization: `Bearer ${token}`,
-          "Content-Type": "application/json",
-          Accept: "application/json",
-        },
         body: JSON.stringify({
           name: selectedAdmin.name,
           email: selectedAdmin.email,
           status: selectedAdmin.status,
-          password: selectedAdmin.password || "password", // Default password if not provided
+          password: selectedAdmin.password || "password",
           role_id: Number.parseInt(selectedAdmin.role_id || "1"),
         }),
       })
 
-      const data = await response.json()
+      const data = result.data
 
-      if (response.status === 401) {
-        setEditMessage("Authentication failed. Please login again.")
-        localStorage.removeItem("token")
-        router.push("/login")
-        return
-      }
-
-      if (response.ok && data.success) {
-        // Show success toast
+      if (result.ok && data.success) {
         addToast("success", "Admin Updated", `Admin "${selectedAdmin.name}" has been successfully updated.`)
-        // Refresh admin list
         fetchAdmins(currentPage, searchType, searchValue)
-        // Close dialog after a short delay
         setTimeout(() => {
           setIsEditDialogOpen(false)
           setSelectedAdmin(null)
           setEditMessage("")
         }, 1000)
       } else {
-        setEditMessage(data.message || `Failed to update admin (Status: ${response.status})`)
+        setEditMessage(data.message || `Failed to update admin (Status: ${result.status})`)
       }
     } catch (error) {
       console.error("Update admin API error:", error)
@@ -561,42 +452,20 @@ export default function AdminPage() {
   // Delete admin
   const deleteAdmin = async (adminId: number, adminName: string) => {
     try {
-      const token = localStorage.getItem("token")
-
-      if (!token) {
-        router.push("/login")
-        return
-      }
-
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/admins/admin/${adminId}`, {
+      const result = await adminFetch(`admins/admin/${adminId}`, {
         method: "DELETE",
-        headers: {
-          Authorization: `Bearer ${token}`,
-          "Content-Type": "application/json",
-          Accept: "application/json",
-        },
       })
 
-      const data = await response.json()
+      const data = result.data
 
-      if (response.status === 401) {
-        localStorage.removeItem("token")
-        router.push("/login")
-        return
-      }
-
-      if (response.ok && data.success) {
-        // Show success toast
+      if (result.ok && data.success) {
         addToast("success", "Admin Deleted", `Admin "${adminName}" has been successfully deleted.`)
-        // Refresh admin list after successful deletion
         fetchAdmins(currentPage, searchType, searchValue)
       } else {
-        // Show error toast
         addToast("error", "Delete Failed", data.message || "Failed to delete admin. Please try again.")
       }
     } catch (error) {
       console.error("Delete admin API error:", error)
-      // Show error toast for network errors
       addToast("error", "Network Error", "A network error occurred while deleting the admin. Please try again.")
     }
   }

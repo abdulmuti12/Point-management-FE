@@ -7,8 +7,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Eye, EyeOff, Loader2, Key } from "lucide-react"
-
-const API_BASE_URL = (process.env.NEXT_PUBLIC_API_URL || "").replace(/\/$/, "")
+import { customerFetch } from "@/lib/auth"
 
 export default function SetPasswordPage() {
   const [newPassword, setNewPassword] = useState("")
@@ -23,6 +22,7 @@ export default function SetPasswordPage() {
 
   useEffect(() => {
     if (typeof window === "undefined") return
+    // setup_token & setup_email are non-sensitive (temporary email setup flow)
     setSetupToken(localStorage.getItem("setup_token"))
     setSetupEmail(localStorage.getItem("setup_email") || "")
   }, [])
@@ -51,9 +51,8 @@ export default function SetPasswordPage() {
     setError("")
 
     try {
-      const res = await fetch(`${API_BASE_URL}/customers/set-password`, {
+      const { ok, data } = await customerFetch("set-password", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           setup_token: setupToken,
           email: setupEmail,
@@ -62,16 +61,15 @@ export default function SetPasswordPage() {
         }),
       })
 
-      const data = await res.json()
-
-      if (res.ok && data.success) {
-        localStorage.setItem("customer_token", data.data?.token)
-        localStorage.setItem("customer_name", data.data?.username || setupEmail.split("@")[0])
+      if (ok && data.success) {
+        localStorage.setItem("customer_name", data.data?.name || setupEmail.split("@")[0])
         localStorage.setItem("customer_email", data.data?.email || setupEmail)
         localStorage.removeItem("setup_token")
         localStorage.removeItem("setup_email")
         setSuccess(true)
-        setTimeout(() => router.push("/customer"), 1500)
+        // Use full page reload to ensure the HttpOnly cookie from BFF set-password
+        // is registered before the customer layout runs checkAuth().
+        setTimeout(() => { window.location.href = "/customer" }, 1000)
       } else {
         setError(data.message || "Gagal mengatur password. Silakan login ulang.")
       }

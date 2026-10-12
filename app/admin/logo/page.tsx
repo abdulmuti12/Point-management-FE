@@ -27,9 +27,10 @@ import {
 } from "@/components/ui/dialog"
 import { Separator } from "@/components/ui/separator"
 import { Label } from "@/components/ui/label"
+import { adminFetch } from "@/lib/auth"
 
 const API_ROOT_URL = (process.env.NEXT_PUBLIC_API_URL || "").replace(/\/$/, "")
-const API_BASE_URL = `${API_ROOT_URL}/admins`
+const API_BASE_URL = "admins"
 const STORAGE_BASE_URL = process.env.NEXT_PUBLIC_STORAGE_URL
   ? `${process.env.NEXT_PUBLIC_STORAGE_URL.replace(/\/$/, "")}/`
   : API_ROOT_URL
@@ -141,25 +142,11 @@ export default function LogoPage() {
     setError(null)
 
     try {
-      const token = localStorage.getItem("token")
-      if (!token) {
-        setError("Authentication required. Please login.")
-        setLoading(false)
-        setIsSearching(false)
-        return
-      }
+      let endpoint = `${API_BASE_URL}/logo?page=${page}`
+      if (description) endpoint += `&description=${encodeURIComponent(description)}`
 
-      let url = `${API_BASE_URL}/logo?page=${page}`
-      if (description) url += `&description=${encodeURIComponent(description)}`
-
-       const response = await fetch(url, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-          "Content-Type": "application/json",
-        },
-      })
-
-      const data: LogoResponse = await response.json()
+      const result = await adminFetch(endpoint)
+      const data: LogoResponse = result.data
 
       if (data.success) {
         setLogos(data.data.data.data)
@@ -225,33 +212,17 @@ export default function LogoPage() {
     setCreateLoading(true)
 
     try {
-      const token = localStorage.getItem("token")
-      if (!token) {
-        setNotification({
-          show: true,
-          message: "Authentication required. Please login.",
-          type: "error",
-        })
-        setTimeout(() => {
-          setNotification((prev) => ({ ...prev, show: false }))
-        }, 3000)
-        setCreateLoading(false)
-        return
-      }
-
       const formDataToSend = new FormData()
       formDataToSend.append("description", formData.description)
       formDataToSend.append("image", imageFile)
 
-      const response = await fetch(`${API_BASE_URL}/logo`, {
+      const result = await adminFetch(`${API_BASE_URL}/logo`, {
         method: "POST",
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
+        headers: {},
         body: formDataToSend,
       })
 
-      const data = await response.json()
+      const data = result.data
 
       if (data.success) {
         setCreateDialogOpen(false)
@@ -307,29 +278,11 @@ export default function LogoPage() {
     setDeleteLoading(true)
 
     try {
-      const token = localStorage.getItem("token")
-      if (!token) {
-        setNotification({
-          show: true,
-          message: "Authentication required. Please login.",
-          type: "error",
-        })
-        setTimeout(() => {
-          setNotification((prev) => ({ ...prev, show: false }))
-        }, 3000)
-        setDeleteLoading(false)
-        return
-      }
-
-      const response = await fetch(`${API_BASE_URL}/logo/${logoToDelete.id}`, {
+      const result = await adminFetch(`${API_BASE_URL}/logo/${logoToDelete.id}`, {
         method: "DELETE",
-        headers: {
-          Authorization: `Bearer ${token}`,
-          "Content-Type": "application/json",
-        },
       })
 
-      const data = await response.json()
+      const data = result.data
 
       if (data.success) {
         setDeleteDialogOpen(false)
@@ -438,13 +391,6 @@ export default function LogoPage() {
     setEditLoading(true)
 
     try {
-      const token = localStorage.getItem("token")
-      if (!token) {
-        showNotification("Authentication required. Please login.", "error")
-        setEditLoading(false)
-        return
-      }
-
       const formDataToSend = new FormData()
       formDataToSend.append("_method", "PUT")
       formDataToSend.append("description", editFormData.description)
@@ -453,15 +399,13 @@ export default function LogoPage() {
         formDataToSend.append("image", editImageFile)
       }
 
-      const response = await fetch(`${API_BASE_URL}/logo/${editFormData.id}`, {
+      const result = await adminFetch(`${API_BASE_URL}/logo/${editFormData.id}`, {
         method: "POST",
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
+        headers: {},
         body: formDataToSend,
       })
 
-      const data = await response.json()
+      const data = result.data
 
       if (data.success) {
         setEditDialogOpen(false)

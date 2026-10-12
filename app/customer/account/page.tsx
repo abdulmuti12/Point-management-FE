@@ -1,16 +1,12 @@
 "use client"
 
 import { useEffect, useState } from "react"
-import { useRouter } from "next/navigation"
 import { User, Mail, Phone, ShieldCheck, Shield } from "lucide-react"
-
-const API_BASE_URL = (process.env.NEXT_PUBLIC_API_URL || "").replace(/\/$/, "")
+import { customerFetch } from "@/lib/auth"
 
 const STORAGE_BASE_URL = process.env.NEXT_PUBLIC_STORAGE_URL
   ? `${process.env.NEXT_PUBLIC_STORAGE_URL.replace(/\/$/, "")}/`
-  : API_BASE_URL
-    ? `${API_BASE_URL.replace(/\/api$/, "")}/storage/`
-    : "http://127.0.0.1:8000/storage/"
+  : "http://127.0.0.1:8000/storage/"
 
 function InfoRow({
   icon,
@@ -52,7 +48,6 @@ type MeData = {
 }
 
 export default function CustomerAccountPage() {
-  const router = useRouter()
   const [customer, setCustomer] = useState<MeData>({
     name: "",
     full_name: "",
@@ -66,12 +61,6 @@ export default function CustomerAccountPage() {
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    const token = localStorage.getItem("customer_token")
-    if (!token) {
-      router.push("/customer/login")
-      return
-    }
-
     const fallback = (): MeData => ({
       name: localStorage.getItem("customer_name") || "",
       full_name: "",
@@ -85,11 +74,8 @@ export default function CustomerAccountPage() {
 
     const fetchMe = async () => {
       try {
-        const res = await fetch(`${API_BASE_URL}/customers/me`, {
-          headers: { Authorization: `Bearer ${token}` },
-        })
-        if (res.ok) {
-          const data = await res.json()
+        const { ok, data } = await customerFetch("me")
+        if (ok) {
           const me = data.data || data
           setCustomer({
             name: me.name || localStorage.getItem("customer_name") || "",
@@ -112,7 +98,7 @@ export default function CustomerAccountPage() {
     }
 
     fetchMe()
-  }, [router])
+  }, [])
 
   if (loading) {
     return (

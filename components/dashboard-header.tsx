@@ -13,6 +13,7 @@ import {
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { SidebarTrigger } from "@/components/ui/sidebar"
 import { User, LogOut, Settings, Bell } from "lucide-react"
+import { logoutAdmin } from "@/lib/auth"
 
 export function DashboardHeader() {
   const router = useRouter()
@@ -24,14 +25,8 @@ export function DashboardHeader() {
     setUserEmail(localStorage.getItem("user_email") || "admin@example.com")
   }, [])
 
-  const handleLogout = () => {
-    // Remove token from localStorage
-    localStorage.removeItem("token")
-    localStorage.removeItem("user_menus")
-    localStorage.removeItem("user_name")
-    localStorage.removeItem("user_email")
-
-    // Redirect to login page
+  const handleLogout = async () => {
+    await logoutAdmin()
     router.push("/login")
   }
 

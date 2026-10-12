@@ -17,27 +17,27 @@ export default function DashboardLayout({
   const router = useRouter()
 
   useEffect(() => {
-    const checkAuth = () => {
+    const checkAuth = async () => {
       try {
-        const token = localStorage.getItem("token")
+        const res = await fetch("/api/bff/me", { credentials: "same-origin" });
+        const data = await res.json();
 
-        if (!token) {
-          router.push("/login")
-          return
+        if (data.authenticated && data.role === "admin") {
+          setIsAuthenticated(true);
+        } else {
+          router.push("/login");
+          return;
         }
-
-        // Token exists, user is authenticated
-        setIsAuthenticated(true)
       } catch (error) {
-        console.error("Auth check error:", error)
-        router.push("/login")
+        console.error("Auth check error:", error);
+        router.push("/login");
       } finally {
-        setIsLoading(false)
+        setIsLoading(false);
       }
-    }
+    };
 
-    checkAuth()
-  }, [router])
+    checkAuth();
+  }, [router]);
 
   if (isLoading) {
     return (

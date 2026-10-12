@@ -4,6 +4,7 @@ import type React from "react"
 
 import { useState, useEffect } from "react"
 import { useRouter, useParams } from "next/navigation"
+import { adminFetch, logoutAdmin } from "@/lib/auth"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import {
@@ -149,44 +150,13 @@ export default function PointCustomerHistoriesPage() {
     }
 
     try {
-      const token = localStorage.getItem("token")
-      if (!token) {
-        setApiError("No authentication token found. Please login.")
-        setIsLoading(false)
-        return
-      }
-
       setIsSearching(true)
       setApiError("")
 
-      const apiBase = (process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000/api").replace(/\/$/, "")
-      const url = `${apiBase}/admins/redeem-point/history/${customerId}?page=${page}`
+      const { ok, data } = await adminFetch(`admins/redeem-point/history/${customerId}?page=${page}`)
 
-      const response = await fetch(url, {
-        method: "GET",
-        headers: {
-          Authorization: `Bearer ${token}`,
-          "Content-Type": "application/json",
-        },
-      })
-
-      if (response.status === 401) {
-        setApiError("Sesi Anda habis. Silakan login ulang untuk mengakses riwayat.")
-        setHistories([])
-        return
-      }
-
-      let responseData: HistoriesApiResponse
-      try {
-        responseData = await response.json()
-      } catch {
-        setApiError("Failed to parse server response. Status: " + response.status)
-        setHistories([])
-        return
-      }
-
-      if (response.ok && responseData.success) {
-        const container = responseData.data?.data
+      if (ok && data.success) {
+        const container = data?.data?.data
         const records: HistoryRecord[] = container?.data ?? []
         const meta = container?.meta
 
@@ -196,23 +166,12 @@ export default function PointCustomerHistoriesPage() {
         setTotalItems(meta?.total || records.length)
         setPerPage(meta?.per_page || 10)
 
-        // Load customer name from /show endpoint
-        const showUrl = `${apiBase}/admins/redeem-point/${customerId}`
-        try {
-          const showRes = await fetch(showUrl, {
-            headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
-          })
-          if (showRes.ok) {
-            const showData = await showRes.json()
-            if (showData.success && showData.data.summary.customer) {
-              setCustomerName(showData.data.summary.customer.full_name || showData.data.summary.customer.name)
-            }
-          }
-        } catch {
-          // Ignore customer name fetch errors
+        const { ok: showOk, data: showData } = await adminFetch(`admins/redeem-point/${customerId}`)
+        if (showOk && showData.success && showData.data.summary.customer) {
+          setCustomerName(showData.data.summary.customer.full_name || showData.data.summary.customer.name)
         }
       } else {
-        setApiError(responseData?.message || "Failed to fetch history data.")
+        setApiError(data?.message || "Failed to fetch history data.")
         setHistories([])
       }
     } catch (err) {

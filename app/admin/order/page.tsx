@@ -42,6 +42,17 @@ import {
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
+import { adminFetch } from "@/lib/auth"
+import type {
+  PointRule,
+  OrderItem,
+  OrderItemFull,
+  ShippingInfo,
+  OrderTotals,
+  OrderTransaction,
+  CategoryOption,
+  BrandOption,
+} from "@/lib/types"
 import {
   Select,
   SelectContent,
@@ -57,64 +68,6 @@ interface OrderCustomer {
   email: string
   phone_number: string
   avatar?: string | null
-}
-
-interface PointRule {
-  name: string
-  range_point: number
-  point: number
-}
-
-interface OrderItem {
-  product_name: string
-  variant_name: string
-  image: string
-}
-
-interface OrderItemFull {
-  id: number
-  product_id: number
-  product_name: string
-  name?: string
-  variant_name: string
-  quantity: number
-  price: number
-  subtotal: number
-  image: string
-  category?: { id: number; name: string } | null
-  brand?: { id: number; name: string } | null
-}
-
-interface ShippingInfo {
-  recipient_name: string
-  phone: string
-  shipping_address: string
-  province_id: string | null
-  province_name: string | null
-  city_id: string | null
-  city_name: string | null
-  district_id: string | null
-  district_name: string | null
-  subdistrict_id: string | null
-  subdistrict_name: string | null
-  postal_code: string | null
-}
-
-interface OrderTotals {
-  subtotal: number
-  shipping_cost: number
-  grand_total: number
-  total_items: number
-  item_count: number
-}
-
-interface OrderTransaction {
-  id?: number
-  payment_method?: string
-  payment_status?: string
-  paid_at?: string | null
-  amount?: number
-  reference?: string | null
 }
 
 interface OrderDetail {
@@ -202,16 +155,6 @@ interface CustomerOption {
   status: string
 }
 
-interface CategoryOption {
-  id: number
-  name: string
-}
-
-interface BrandOption {
-  id: number
-  name: string
-}
-
 interface ManualOrderItem {
   temp_id: string
   name: string
@@ -241,6 +184,7 @@ const STATUS_OPTIONS = [
 ]
 
 export default function OrderPage() {
+  const router = useRouter()
   const [orders, setOrders] = useState<Order[]>([])
   const [searchValue, setSearchValue] = useState("")
   const [currentPage, setCurrentPage] = useState(1)
@@ -286,7 +230,6 @@ export default function OrderPage() {
     note: "",
   })
   const [newCustomerError, setNewCustomerError] = useState("")
-  const router = useRouter()
 
   // Toast notification functions
   const addToast = (type: "success" | "error", title: string, message: string) => {
@@ -306,15 +249,6 @@ export default function OrderPage() {
   // Fetch orders data from API
   const fetchOrders = async (page = 1, value = "") => {
     try {
-      const token = localStorage.getItem("token")
-
-      if (!token) {
-        setApiError("No authentication token found. Please login.")
-        setIsLoading(false)
-        setIsSearching(false)
-        return
-      }
-
       setIsSearching(true)
       setApiError("")
 
@@ -324,78 +258,39 @@ export default function OrderPage() {
         params.append("search", value.trim())
       }
 
-      const apiBase = (process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000/api").replace(/\/$/, "")
-      const url = `${apiBase}/admins/get-orders${params.toString() ? `?${params.toString()}` : ""}`
+      const query = params.toString() ? `?${params.toString()}` : ""
+      const { ok, status, data: responseData } = await adminFetch(`admins/get-orders${query}`)
 
-      console.log("Fetching orders from:", url)
-
-      const response = await fetch(url, {
-        method: "GET",
-        headers: {
-          Authorization: `Bearer ${token}`,
-          "Content-Type": "application/json",
-        },
-      })
-
-      console.log("Response status:", response.status)
-
-      if (response.status === 401) {
-        console.log("Unauthorized access, redirecting to login")
-        localStorage.removeItem("token")
-        router.push("/login")
-        return
-      }
-
-      let responseData: ApiResponse | any
-      try {
-        responseData = await response.json()
-        console.log("API Response:", responseData)
-      } catch (parseError) {
-        console.error("Failed to parse JSON response:", parseError)
-        setApiError(`Failed to parse server response. Status: ${response.status}`)
+      if (responseData.success === false) {
+        setApiError(responseData.message || "API returned success: false")
+        addToast("error", "Error", responseData.message || "Failed to fetch orders")
         setOrders([])
+        setCurrentPage(1)
+        setTotalPages(1)
+        setTotalItems(0)
         return
       }
 
-      if (response.ok) {
-        if (responseData.success === false) {
-          setApiError(responseData.message || "API returned success: false")
-          addToast("error", "Error", responseData.message || "Failed to fetch orders")
-          setOrders([])
-          setCurrentPage(1)
-          setTotalPages(1)
-          setTotalItems(0)
-          return
-        }
-
-        // Extract data: responseData.data.data is the array of orders
+      if (ok) {
         if (responseData.data && Array.isArray(responseData.data.data)) {
           const ordersList = responseData.data.data
-          console.log("Raw orders data:", ordersList)
-
           setOrders(ordersList)
           setCurrentPage(responseData.data.meta?.current_page || 1)
           setTotalPages(responseData.data.meta?.last_page || 1)
           setTotalItems(responseData.data.meta?.total || 0)
           setPerPage(responseData.data.meta?.per_page || 10)
-          console.log("Orders loaded successfully:", ordersList.length, "orders")
         } else {
-          console.error("Unexpected API response structure:", responseData)
-          setApiError(`Unexpected data format from server. Expected array of orders.`)
+          setApiError("Unexpected data format from server. Expected array of orders.")
           setOrders([])
         }
       } else {
-        const errorMessage = responseData?.message || `HTTP ${response.status}: ${response.statusText}`
+        const errorMessage = responseData?.message || `HTTP ${status}`
         setApiError(errorMessage)
         addToast("error", "API Error", errorMessage)
         setOrders([])
-        console.error("API Error:", errorMessage)
       }
     } catch (error) {
       console.error("Network error:", error)
-      const errorMessage = error instanceof Error ? error.message : "Unknown network error"
-      setApiError(`Network error: ${errorMessage}`)
-      addToast("error", "Network Error", "Failed to connect to server. Please check your connection.")
       setOrders([])
     } finally {
       setIsLoading(false)
@@ -449,38 +344,12 @@ export default function OrderPage() {
     setIsLoadingDetail(true)
 
     try {
-      const token = localStorage.getItem("token")
+      const { ok, status, data } = await adminFetch(`admins/get-orders/${order.id}`)
 
-      if (!token) {
-        setDetailError("No authentication token found. Please login.")
-        setIsLoadingDetail(false)
-        router.push("/login")
-        return
-      }
-
-      const apiBase = (process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000/api").replace(/\/$/, "")
-      const url = `${apiBase}/admins/get-orders/${order.id}`
-
-      const response = await fetch(url, {
-        method: "GET",
-        headers: {
-          Authorization: `Bearer ${token}`,
-          "Content-Type": "application/json",
-        },
-      })
-
-      if (response.status === 401) {
-        localStorage.removeItem("token")
-        router.push("/login")
-        return
-      }
-
-      const data = await response.json()
-
-      if (response.ok && data.success) {
+      if (ok && data.success) {
         setSelectedOrderDetail(data.data)
       } else {
-        setDetailError(data.message || `Failed to load order detail (Status: ${response.status})`)
+        setDetailError(data.message || `Failed to load order detail (Status: ${status})`)
       }
     } catch (error) {
       console.error("Fetch order detail error:", error)
@@ -535,32 +404,9 @@ export default function OrderPage() {
 
   const fetchCustomers = async () => {
     try {
-      const token = localStorage.getItem("token")
-      if (!token) {
-        router.push("/login")
-        return
-      }
-
       setIsLoadingCustomers(true)
-      const apiBase = (process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000/api").replace(/\/$/, "")
-      const url = `${apiBase}/admins/get-customers?per_page=100`
-
-      const response = await fetch(url, {
-        method: "GET",
-        headers: {
-          Authorization: `Bearer ${token}`,
-          "Content-Type": "application/json",
-        },
-      })
-
-      if (response.status === 401) {
-        localStorage.removeItem("token")
-        router.push("/login")
-        return
-      }
-
-      const data = await response.json()
-      if (response.ok && data.success) {
+      const { ok, data } = await adminFetch("admins/get-customers?per_page=100")
+      if (ok && data.success) {
         const list: CustomerOption[] = data.data?.data || []
         setCustomers(list)
         if (list.length === 0) {
@@ -599,23 +445,12 @@ export default function OrderPage() {
       return
     }
     try {
-      const token = localStorage.getItem("token")
-      if (!token) {
-        router.push("/login")
-        return
-      }
       setIsAddingCustomer(true)
-      const apiBase = (process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000/api").replace(/\/$/, "")
-      const response = await fetch(`${apiBase}/admins/customer`, {
+      const { ok, status, data } = await adminFetch("admins/customer", {
         method: "POST",
-        headers: {
-          Authorization: `Bearer ${token}`,
-          "Content-Type": "application/json",
-        },
         body: JSON.stringify(newCustomerForm),
       })
-      const data = await response.json()
-      if (response.ok && data.success) {
+      if (ok && data.success) {
         const created = data.data?.customer
         addToast("success", "Customer ditambahkan", `Akun untuk ${created?.full_name} berhasil dibuat.`)
         await fetchCustomers()
@@ -632,7 +467,7 @@ export default function OrderPage() {
       } else {
         const errorMsg = data?.error || data?.message || "Gagal menambahkan customer."
         setNewCustomerError(errorMsg)
-        if (response.status === 409 || response.status === 422) {
+        if (status === 409 || status === 422) {
           addToast("error", "Gagal membuat customer", errorMsg)
         }
       }
@@ -647,28 +482,11 @@ export default function OrderPage() {
 
   const fetchCategories = async () => {
     try {
-      const token = localStorage.getItem("token")
-      if (!token) return
       setIsLoadingLookups(true)
-      const apiBase = (process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000/api").replace(/\/$/, "")
-      const response = await fetch(`${apiBase}/admins/get-categories`, {
-        method: "GET",
-        headers: {
-          Authorization: `Bearer ${token}`,
-          "Content-Type": "application/json",
-        },
-      })
-      if (response.status === 401) {
-        localStorage.removeItem("token")
-        router.push("/login")
-        return
-      }
-      const categoryData = await response.json()
-      if (response.ok && categoryData.success) {
+      const { ok, data: categoryData } = await adminFetch("admins/get-categories")
+      if (ok && categoryData.success) {
         const list: CategoryOption[] = Array.isArray(categoryData.data) ? categoryData.data : []
         setCategories(list)
-      } else {
-        console.warn("Fetch categories failed:", categoryData.message)
       }
     } catch (error) {
       console.error("Fetch categories error:", error)
@@ -679,28 +497,11 @@ export default function OrderPage() {
 
   const fetchBrands = async () => {
     try {
-      const token = localStorage.getItem("token")
-      if (!token) return
       setIsLoadingLookups(true)
-      const apiBase = (process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000/api").replace(/\/$/, "")
-      const response = await fetch(`${apiBase}/admins/get-brands`, {
-        method: "GET",
-        headers: {
-          Authorization: `Bearer ${token}`,
-          "Content-Type": "application/json",
-        },
-      })
-      if (response.status === 401) {
-        localStorage.removeItem("token")
-        router.push("/login")
-        return
-      }
-      const brandData = await response.json()
-      if (response.ok && brandData.success) {
+      const { ok, data: brandData } = await adminFetch("admins/get-brands")
+      if (ok && brandData.success) {
         const list: BrandOption[] = Array.isArray(brandData.data) ? brandData.data : []
         setBrands(list)
-      } else {
-        console.warn("Fetch brands failed:", brandData.message)
       }
     } catch (error) {
       console.error("Fetch brands error:", error)
@@ -810,34 +611,13 @@ export default function OrderPage() {
     if (manualOrderForm.phone.trim()) payload.phone = manualOrderForm.phone.trim()
 
     try {
-      const token = localStorage.getItem("token")
-      if (!token) {
-        router.push("/login")
-        return
-      }
-
       setIsSubmittingOrder(true)
-      const apiBase = (process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000/api").replace(/\/$/, "")
-      const url = `${apiBase}/admins/order`
-
-      const response = await fetch(url, {
+      const { ok, data } = await adminFetch("admins/order", {
         method: "POST",
-        headers: {
-          Authorization: `Bearer ${token}`,
-          "Content-Type": "application/json",
-        },
         body: JSON.stringify(payload),
       })
 
-      if (response.status === 401) {
-        localStorage.removeItem("token")
-        router.push("/login")
-        return
-      }
-
-      const data = await response.json()
-
-      if (response.ok && data.success) {
+      if (ok && data.success) {
         addToast(
           "success",
           "Transaksi Berhasil",
@@ -846,12 +626,10 @@ export default function OrderPage() {
         setIsManualOrderOpen(false)
         fetchOrders(currentPage, searchValue)
 
-        // Opsional: trigger hitung point jika status delivered
         if (manualOrderForm.status === "delivered") {
           try {
-            await fetch(`${apiBase}/admins/redeem-point/calculate/${manualOrderForm.customer_id}`, {
+            await adminFetch(`admins/redeem-point/calculate/${manualOrderForm.customer_id}`, {
               method: "POST",
-              headers: { Authorization: `Bearer ${token}` },
             })
           } catch (e) {
             console.warn("Point calc trigger failed (non-blocking):", e)
@@ -867,9 +645,8 @@ export default function OrderPage() {
       }
     } catch (error) {
       console.error("Submit manual order error:", error)
-      const message = error instanceof Error ? error.message : "Network error."
-      setOrderFormError(message)
-      addToast("error", "Network Error", message)
+      setOrderFormError("Network error occurred while submitting order.")
+      addToast("error", "Network Error", "Network error occurred while submitting order.")
     } finally {
       setIsSubmittingOrder(false)
     }

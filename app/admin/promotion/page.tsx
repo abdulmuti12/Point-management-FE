@@ -21,6 +21,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Plus, Edit, Trash2, Eye, Gift, TrendingUp, Calendar, ImageIcon, Loader2 } from "lucide-react"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Skeleton } from "@/components/ui/skeleton"
+import { adminFetch } from "@/lib/auth"
+import type { BrandOption } from "@/lib/types"
 
 interface PromotionData {
   id: number
@@ -40,10 +42,7 @@ interface PromotionData {
   updated_at: string
 }
 
-interface BrandData {
-  id: number
-  name: string
-}
+type BrandData = BrandOption
 
 interface ApiResponse {
   success: boolean
@@ -64,8 +63,6 @@ interface ApiResponse {
   status: number
 }
 
-const API_URL = (process.env.NEXT_PUBLIC_API_URL || "").replace(/\/$/, "")
-const ADMINS_API_BASE_URL = `${API_URL}/admins`
 
 export default function PromotionPage() {
   const [promotions, setPromotions] = useState<PromotionData[]>([])
@@ -143,18 +140,8 @@ export default function PromotionPage() {
   const fetchBrands = async () => {
     setBrandsLoading(true)
     try {
-      const token = localStorage.getItem("token")
-      if (!token) return
-
-      const response = await fetch(`${ADMINS_API_BASE_URL}/get-brand`, {
-        method: "GET",
-        headers: {
-          Authorization: `Bearer ${token}`,
-          "Content-Type": "application/json",
-        },
-      })
-
-      const data = await response.json()
+      const result = await adminFetch("admins/get-brand")
+      const data = result.data
       if (data.success) {
         setBrands(data.data || [])
       } else {
@@ -171,33 +158,15 @@ export default function PromotionPage() {
   const fetchPromotions = async () => {
     try {
       setLoading(true)
-      const token = localStorage.getItem("token")
 
-      if (!token) {
-        setError("No authentication token found")
-        return
-      }
+      const result = await adminFetch("admins/promotion")
+      const data: ApiResponse = result.data
 
-      const response = await fetch(`${ADMINS_API_BASE_URL}/promotion`, {
-        method: "GET",
-        headers: {
-          Authorization: `Bearer ${token}`,
-          "Content-Type": "application/json",
-        },
-      })
-
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`)
-      }
-
-      const result: ApiResponse = await response.json()
-      console.log("API Response:", result)
-
-      if (result.success) {
-        setPromotions(result.data.data.data)
+      if (data.success) {
+        setPromotions(data.data.data.data)
         setError(null)
       } else {
-        setError(result.message || "Failed to fetch promotions")
+        setError(data.message || "Failed to fetch promotions")
       }
     } catch (err) {
       console.error("Error fetching promotions:", err)
@@ -215,12 +184,6 @@ export default function PromotionPage() {
 
     try {
       setIsSubmitting(true)
-      const token = localStorage.getItem("token")
-
-      if (!token) {
-        setError("No authentication token found")
-        return
-      }
 
       const formData = new FormData()
       formData.append("name", newPromotion.name)
@@ -234,15 +197,13 @@ export default function PromotionPage() {
         formData.append("file", newPromotion.file)
       }
 
-      const response = await fetch(`${ADMINS_API_BASE_URL}/promotion`, {
+      const result = await adminFetch("admins/promotion", {
         method: "POST",
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
+        headers: {},
         body: formData,
       })
 
-      if (response.ok) {
+      if (result.ok) {
         await fetchPromotions()
         setIsAddDialogOpen(false)
         setNewPromotion({
@@ -256,8 +217,7 @@ export default function PromotionPage() {
         })
         setError(null)
       } else {
-        const errorData = await response.json()
-        setError(errorData.message || "Failed to add promotion")
+        setError(result.data.message || "Failed to add promotion")
       }
     } catch (err) {
       console.error("Error adding promotion:", err)
@@ -275,12 +235,6 @@ export default function PromotionPage() {
 
     try {
       setIsSubmitting(true)
-      const token = localStorage.getItem("token")
-
-      if (!token) {
-        setError("No authentication token found")
-        return
-      }
 
       const formData = new FormData()
       formData.append("name", editPromotion.name)
@@ -295,22 +249,19 @@ export default function PromotionPage() {
         formData.append("file", editPromotion.file)
       }
 
-      const response = await fetch(`${ADMINS_API_BASE_URL}/promotion/${promotionToEdit.id}`, {
+      const result = await adminFetch(`admins/promotion/${promotionToEdit.id}`, {
         method: "POST",
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
+        headers: {},
         body: formData,
       })
 
-      if (response.ok) {
+      if (result.ok) {
         await fetchPromotions()
         setIsEditDialogOpen(false)
         setPromotionToEdit(null)
         setError(null)
       } else {
-        const errorData = await response.json()
-        setError(errorData.message || "Failed to update promotion")
+        setError(result.data.message || "Failed to update promotion")
       }
     } catch (err) {
       console.error("Error updating promotion:", err)
@@ -325,29 +276,18 @@ export default function PromotionPage() {
 
     try {
       setIsSubmitting(true)
-      const token = localStorage.getItem("token")
 
-      if (!token) {
-        setError("No authentication token found")
-        return
-      }
-
-      const response = await fetch(`${ADMINS_API_BASE_URL}/promotion/${promotionToDelete.id}`, {
+      const result = await adminFetch(`admins/promotion/${promotionToDelete.id}`, {
         method: "DELETE",
-        headers: {
-          Authorization: `Bearer ${token}`,
-          "Content-Type": "application/json",
-        },
       })
 
-      if (response.ok) {
+      if (result.ok) {
         await fetchPromotions()
         setIsDeleteDialogOpen(false)
         setPromotionToDelete(null)
         setError(null)
       } else {
-        const errorData = await response.json()
-        setError(errorData.message || "Failed to delete promotion")
+        setError(result.data.message || "Failed to delete promotion")
       }
     } catch (err) {
       console.error("Error deleting promotion:", err)

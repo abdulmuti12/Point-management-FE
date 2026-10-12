@@ -4,6 +4,7 @@ import { useState, useEffect } from "react"
 import { usePathname, useRouter } from "next/navigation"
 import { Menu, LayoutDashboard } from "lucide-react"
 import { CustomerSidebar } from "./customer-sidebar"
+import { checkAuth } from "@/lib/auth"
 
 export function CustomerDashboardLayout({
   children,
@@ -17,13 +18,34 @@ export function CustomerDashboardLayout({
   const [mobileOpen, setMobileOpen] = useState(false)
 
   useEffect(() => {
-    const token = localStorage.getItem("customer_token")
-    if (!token) {
+    const verify = async () => {
+      // Retry logic: after set-password the cookie may not be registered yet
+      const MAX_RETRIES = 3
+      const RETRY_DELAY_MS = 800
+
+      for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
+        try {
+          const result = await checkAuth()
+          if (result.authenticated && result.role === "customer") {
+            setCustomerName(localStorage.getItem("customer_name") || "Pelanggan")
+            setIsAuth(true)
+            return
+          }
+        } catch {}
+
+        // If localStorage has a customer session hint (post-login/set-password),
+        // the cookie is likely valid but not yet registered — retry before
+        // redirecting to login.
+        if (localStorage.getItem("customer_email")) {
+          await new Promise((r) => setTimeout(r, RETRY_DELAY_MS))
+          continue
+        }
+        break // No session hint — fail immediately
+      }
+
       router.push("/customer/login")
-      return
     }
-    setCustomerName(localStorage.getItem("customer_name") || "Pelanggan")
-    setIsAuth(true)
+    verify()
   }, [router])
 
   if (!isAuth) {

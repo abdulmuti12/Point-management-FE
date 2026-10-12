@@ -1,7 +1,6 @@
 "use client"
 
 import { useEffect, useState } from "react"
-import { useRouter } from "next/navigation"
 import {
   Package,
   ChevronRight,
@@ -12,6 +11,7 @@ import {
   Loader2,
   Star,
 } from "lucide-react"
+import { customerFetch } from "@/lib/auth"
 
 type OrderStatus = "pending" | "processing" | "shipped" | "delivered" | "cancelled" | "success"
 
@@ -35,8 +35,6 @@ type Order = {
   point_qualifies?: boolean
   items: OrderItem[]
 }
-
-const API_BASE = (process.env.NEXT_PUBLIC_API_URL || "").replace(/\/$/, "")
 
 const statusConfig: Record<OrderStatus, { label: string; color: string; icon: React.ElementType }> = {
   pending: {
@@ -88,47 +86,24 @@ function formatDate(dateStr: string) {
 }
 
 export default function CustomerOrdersPage() {
-  const router = useRouter()
   const [orders, setOrders] = useState<Order[]>([])
   const [expandedId, setExpandedId] = useState<number | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState("")
 
   useEffect(() => {
-    const token = localStorage.getItem("customer_token")
-
-    if (!token) {
-      router.push("/customer/login")
-      return
-    }
-
     const fetchOrders = async () => {
       try {
-        const response = await fetch(`${API_BASE}/customers/get-orders`, {
-          method: "GET",
-          headers: {
-            Authorization: `Bearer ${token}`,
-            "Content-Type": "application/json",
-            "X-Requested-With": "XMLHttpRequest",
-          },
-        })
+        const { ok, status, data } = await customerFetch("get-orders")
 
-        if (response.status === 401) {
-          localStorage.removeItem("customer_token")
-          localStorage.removeItem("customer_name")
-          router.push("/customer/login")
-          return
-        }
-
-        if (!response.ok) {
-          setError(`Gagal memuat pesanan (${response.status})`)
+        if (!ok) {
+          setError(`Gagal memuat pesanan (${status})`)
           setIsLoading(false)
           return
         }
 
-        const json = await response.json()
-        if (json.success && Array.isArray(json.data)) {
-          setOrders(json.data)
+        if (data.success && Array.isArray(data.data)) {
+          setOrders(data.data)
         } else {
           setOrders([])
         }
@@ -140,7 +115,7 @@ export default function CustomerOrdersPage() {
     }
 
     fetchOrders()
-  }, [router])
+  }, [])
 
   return (
     <div className="space-y-6">

@@ -39,6 +39,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { adminFetch, logoutAdmin } from "@/lib/auth"
 
 interface PointData {
   id: string
@@ -158,15 +159,6 @@ export default function PointPage() {
   // Fetch points data from API
   const fetchPoints = async (page = 1, value = "") => {
     try {
-      const token = localStorage.getItem("token")
-
-      if (!token) {
-        setApiError("No authentication token found. Please login.")
-        setIsLoading(false)
-        setIsSearching(false)
-        return
-      }
-
       setIsSearching(true)
       setApiError("")
 
@@ -176,40 +168,10 @@ export default function PointPage() {
         params.append("name", value.trim())
       }
 
-      const apiBase = (process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000/api").replace(/\/$/, "")
-      const url = `${apiBase}/admins/point${params.toString() ? `?${params.toString()}` : ""}`
+      const endpoint = `admins/point${params.toString() ? `?${params.toString()}` : ""}`
+      const { ok, status, data: responseData } = await adminFetch(endpoint)
 
-      console.log("Fetching points from:", url)
-
-      const response = await fetch(url, {
-        method: "GET",
-        headers: {
-          Authorization: `Bearer ${token}`,
-          "Content-Type": "application/json",
-        },
-      })
-
-      console.log("Response status:", response.status)
-
-      if (response.status === 401) {
-        console.log("Unauthorized access, redirecting to login")
-        localStorage.removeItem("token")
-        router.push("/login")
-        return
-      }
-
-      let responseData: ApiResponse | any
-      try {
-        responseData = await response.json()
-        console.log("API Response:", responseData)
-      } catch (parseError) {
-        console.error("Failed to parse JSON response:", parseError)
-        setApiError(`Failed to parse server response. Status: ${response.status}`)
-        setPoints([])
-        return
-      }
-
-      if (response.ok) {
+      if (ok) {
         if (responseData.success === false) {
           setApiError(responseData.message || "API returned success: false")
           addToast("error", "Error", responseData.message || "Failed to fetch points")
@@ -220,7 +182,6 @@ export default function PointPage() {
           return
         }
 
-        // Extract data: responseData.data.data.data is the array
         if (
           responseData.data &&
           responseData.data.data &&
@@ -228,30 +189,23 @@ export default function PointPage() {
           Array.isArray(responseData.data.data.data)
         ) {
           const pointsList = responseData.data.data.data
-          console.log("Raw points data:", pointsList)
-
           setPoints(pointsList)
           setCurrentPage(responseData.data.meta?.current_page || 1)
           setTotalPages(responseData.data.meta?.last_page || 1)
           setTotalItems(responseData.data.meta?.total || 0)
-          console.log("Points loaded successfully:", pointsList.length, "points")
         } else {
-          console.error("Unexpected API response structure:", responseData)
           setApiError(`Unexpected data format from server.`)
           setPoints([])
         }
       } else {
-        const errorMessage = responseData?.message || `HTTP ${response.status}: ${response.statusText}`
+        const errorMessage = responseData?.message || `HTTP ${status}`
         setApiError(errorMessage)
         addToast("error", "API Error", errorMessage)
         setPoints([])
-        console.error("API Error:", errorMessage)
       }
     } catch (error) {
-      console.error("Network error:", error)
-      const errorMessage = error instanceof Error ? error.message : "Unknown network error"
-      setApiError(`Network error: ${errorMessage}`)
-      addToast("error", "Network Error", "Failed to connect to server. Please check your connection.")
+      await logoutAdmin()
+      router.push("/login")
       setPoints([])
     } finally {
       setIsLoading(false)
@@ -391,26 +345,11 @@ export default function PointPage() {
   // Create point function
   const createPoint = async () => {
     try {
-      const token = localStorage.getItem("token")
-
-      if (!token) {
-        setCreateMessage("Authentication token not found. Please login again.")
-        router.push("/login")
-        return
-      }
-
       setIsCreatingPoint(true)
       setCreateMessage("")
 
-      const apiBase = (process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000/api").replace(/\/$/, "")
-      const url = `${apiBase}/admins/point`
-
-      const response = await fetch(url, {
+      const { ok, status, data } = await adminFetch("admins/point", {
         method: "POST",
-        headers: {
-          Authorization: `Bearer ${token}`,
-          "Content-Type": "application/json",
-        },
         body: JSON.stringify({
           name: newPoint.name,
           status: newPoint.status,
@@ -421,17 +360,7 @@ export default function PointPage() {
         }),
       })
 
-      const data = await response.json()
-      console.log("Create point response:", data)
-
-      if (response.status === 401) {
-        setCreateMessage("Authentication failed. Please login again.")
-        localStorage.removeItem("token")
-        router.push("/login")
-        return
-      }
-
-      if (response.ok && data.success) {
+      if (ok && data.success) {
         addToast("success", "Point Created", `Point "${newPoint.name}" has been successfully created.`)
         setNewPoint({
           name: "",
@@ -447,10 +376,11 @@ export default function PointPage() {
           setCreateMessage("")
         }, 1500)
       } else {
-        setCreateMessage(data.message || `Failed to create point (Status: ${response.status})`)
+        setCreateMessage(data.message || `Failed to create point (Status: ${status})`)
       }
     } catch (error) {
-      console.error("Create point API error:", error)
+      await logoutAdmin()
+      router.push("/login")
       setCreateMessage("Network error occurred while creating point")
     } finally {
       setIsCreatingPoint(false)
@@ -476,38 +406,14 @@ export default function PointPage() {
     if (!pointToDelete) return
 
     try {
-      const token = localStorage.getItem("token")
-
-      if (!token) {
-        setDeleteMessage("Authentication token not found. Please login again.")
-        router.push("/login")
-        return
-      }
-
       setIsDeletingPoint(true)
       setDeleteMessage("")
 
-      const apiBase = (process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000/api").replace(/\/$/, "")
-      const url = `${apiBase}/admins/point/${pointToDelete.id}`
-
-      const response = await fetch(url, {
+      const { ok, status, data } = await adminFetch(`admins/point/${pointToDelete.id}`, {
         method: "DELETE",
-        headers: {
-          Authorization: `Bearer ${token}`,
-          "Content-Type": "application/json",
-        },
       })
 
-      const data = await response.json()
-
-      if (response.status === 401) {
-        setDeleteMessage("Authentication failed. Please login again.")
-        localStorage.removeItem("token")
-        router.push("/login")
-        return
-      }
-
-      if (response.ok && data.success) {
+      if (ok && data.success) {
         addToast("success", "Point Deleted", `Point "${pointToDelete.name}" has been successfully deleted.`)
         fetchPoints(currentPage, searchValue)
         setTimeout(() => {
@@ -516,10 +422,11 @@ export default function PointPage() {
           setDeleteMessage("")
         }, 1500)
       } else {
-        setDeleteMessage(data.message || `Failed to delete point (Status: ${response.status})`)
+        setDeleteMessage(data.message || `Failed to delete point (Status: ${status})`)
       }
     } catch (error) {
-      console.error("Delete point API error:", error)
+      await logoutAdmin()
+      router.push("/login")
       setDeleteMessage("Network error occurred while deleting point")
     } finally {
       setIsDeletingPoint(false)
@@ -552,35 +459,9 @@ export default function PointPage() {
     })
 
     try {
-      const token = localStorage.getItem("token")
+      const { ok, status, data } = await adminFetch(`admins/point-edit/${point.id}`)
 
-      if (!token) {
-        setEditMessage("Authentication token not found. Please login again.")
-        router.push("/login")
-        return
-      }
-
-      const apiBase = (process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000/api").replace(/\/$/, "")
-      const url = `${apiBase}/admins/point-edit/${point.id}`
-
-      const response = await fetch(url, {
-        method: "GET",
-        headers: {
-          Authorization: `Bearer ${token}`,
-          "Content-Type": "application/json",
-        },
-      })
-
-      const data = await response.json()
-
-      if (response.status === 401) {
-        setEditMessage("Authentication failed. Please login again.")
-        localStorage.removeItem("token")
-        router.push("/login")
-        return
-      }
-
-      if (response.ok && data.success) {
+      if (ok && data.success) {
         const pointData = data.data
         setEditPoint({
           name: pointData.name || "",
@@ -590,12 +471,12 @@ export default function PointPage() {
           range_point: Number(pointData.range_point) || 0,
           description: pointData.description || "",
         })
-        console.log("Edit data loaded:", pointData)
       } else {
-        setEditMessage(data.message || `Failed to load point data (Status: ${response.status})`)
+        setEditMessage(data.message || `Failed to load point data (Status: ${status})`)
       }
     } catch (error) {
-      console.error("Load point data API error:", error)
+      await logoutAdmin()
+      router.push("/login")
       setEditMessage("Network error occurred while loading point data")
     } finally {
       setIsLoadingEditData(false)
@@ -622,26 +503,11 @@ export default function PointPage() {
     if (!pointToEdit) return
 
     try {
-      const token = localStorage.getItem("token")
-
-      if (!token) {
-        setEditMessage("Authentication token not found. Please login again.")
-        router.push("/login")
-        return
-      }
-
       setIsUpdatingPoint(true)
       setEditMessage("")
 
-      const apiBase = (process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000/api").replace(/\/$/, "")
-      const url = `${apiBase}/admins/point/${pointToEdit.id}`
-
-      const response = await fetch(url, {
+      const { ok, status, data } = await adminFetch(`admins/point/${pointToEdit.id}`, {
         method: "PUT",
-        headers: {
-          Authorization: `Bearer ${token}`,
-          "Content-Type": "application/json",
-        },
         body: JSON.stringify({
           name: editPoint.name.trim(),
           status: editPoint.status,
@@ -652,26 +518,7 @@ export default function PointPage() {
         }),
       })
 
-      console.log("Update response status:", response.status)
-
-      let data: any
-      try {
-        data = await response.json()
-        console.log("Update response data:", data)
-      } catch (parseError) {
-        console.error("Failed to parse update response:", parseError)
-        setEditMessage("Failed to parse server response")
-        return
-      }
-
-      if (response.status === 401) {
-        setEditMessage("Authentication failed. Please login again.")
-        localStorage.removeItem("token")
-        router.push("/login")
-        return
-      }
-
-      if (response.ok && data.success) {
+      if (ok && data.success) {
         addToast("success", "Point Updated", `Point "${editPoint.name}" has been successfully updated.`)
         fetchPoints(currentPage, searchValue)
         setTimeout(() => {
@@ -680,10 +527,11 @@ export default function PointPage() {
           setEditMessage("")
         }, 1500)
       } else {
-        setEditMessage(data?.message || `Failed to update point (Status: ${response.status})`)
+        setEditMessage(data?.message || `Failed to update point (Status: ${status})`)
       }
     } catch (error) {
-      console.error("Update point API error:", error)
+      await logoutAdmin()
+      router.push("/login")
       setEditMessage("Network error occurred while updating point")
     } finally {
       setIsUpdatingPoint(false)

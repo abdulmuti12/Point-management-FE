@@ -41,6 +41,7 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import Image from "next/image"
+import { adminFetch, logoutAdmin } from "@/lib/auth"
 
 type MemberLevel = {
   id: string
@@ -93,23 +94,6 @@ export default function MemberLevelPage() {
   const [editFile, setEditFile] = useState<File | null>(null)
   const [existingFilePath, setExistingFilePath] = useState<string | null>(null)
 
-  const API_BASE = `${process.env.NEXT_PUBLIC_API_URL}/admins/member_level`
-
-  const getHeaders = () => {
-    const token = typeof window !== "undefined" ? localStorage.getItem("token") : null
-    if (!token) {
-      console.error("No auth token found in localStorage!")
-      toast({
-        title: "Error",
-        description: "Session habis, mohon login ulang.",
-        variant: "destructive",
-      })
-      router.push("/login")
-      return {}
-    }
-    return { Authorization: `Bearer ${token}`, Accept: "application/json" }
-  }
-
   // Fetch levels
   const fetchLevels = async (page = currentPage, search = searchTerm, status = statusFilter) => {
     setLoading(true)
@@ -118,12 +102,8 @@ export default function MemberLevelPage() {
       if (search) params.append("name", search)
       if (status && status !== "all") params.append("status", status)
 
-      const res = await fetch(`${API_BASE}?${params.toString()}`, {
-        headers: getHeaders(),
-      })
-      if (!res.ok) throw new Error("Failed to fetch")
-      const data = await res.json()
-      if (data.success) {
+      const { ok, data } = await adminFetch(`admins/member_level?${params.toString()}`)
+      if (ok && data.success) {
         setLevels(data.data.data)
         setMeta(data.data.meta)
         setTotalPages(data.data.meta.last_page)
@@ -214,13 +194,6 @@ export default function MemberLevelPage() {
       return
     }
 
-    const token = localStorage.getItem("token")
-    if (!token) {
-      toast({ title: "Error", description: "Token autentikasi tidak ditemukan", variant: "destructive" })
-      router.push("/login")
-      return
-    }
-
     setSubmitLoading(true)
     const formData = new FormData()
     formData.append("name", name)
@@ -237,15 +210,11 @@ export default function MemberLevelPage() {
     }
 
     try {
-      const res = await fetch(API_BASE, {
+      const { ok, data } = await adminFetch("admins/member_level", {
         method: "POST",
         body: formData,
-        headers: getHeaders(),
       })
-      console.log("Create response status:", res.status)
-      const data = await res.json()
-      console.log("Create response data:", data)
-      if (data.success) {
+      if (ok && data.success) {
         toast({
           title: "Berhasil",
           description: data.data.message || "Member Level berhasil ditambahkan",
@@ -261,6 +230,8 @@ export default function MemberLevelPage() {
         })
       }
     } catch (error) {
+      await logoutAdmin()
+      router.push("/login")
       toast({
         title: "Error",
         description: "Terjadi kesalahan saat menambahkan Member Level",
@@ -318,21 +289,11 @@ export default function MemberLevelPage() {
     }
 
     try {
-      const res = await fetch(`${API_BASE}/${selectedLevel.id}`, {
+      const { ok, data } = await adminFetch(`admins/member_level/${selectedLevel.id}`, {
         method: "POST",
         body: formData,
-        headers: { ...getHeaders(), Accept: "application/json" },
       })
-      if (!res.ok) {
-        if (res.status === 401) {
-          toast({ title: "Session Expired", description: "Mohon login ulang", variant: "destructive" })
-          router.push("/login")
-          return
-        }
-        throw new Error("Update failed")
-      }
-      const data = await res.json()
-      if (data.success) {
+      if (ok && data.success) {
         toast({
           title: "Berhasil",
           description: data.data.message || "Member Level berhasil diupdate",
@@ -348,6 +309,8 @@ export default function MemberLevelPage() {
         })
       }
     } catch (error) {
+      await logoutAdmin()
+      router.push("/login")
       toast({
         title: "Error",
         description: "Terjadi kesalahan saat mengupdate Member Level",
@@ -364,20 +327,10 @@ export default function MemberLevelPage() {
 
     setSubmitLoading(true)
     try {
-      const res = await fetch(`${API_BASE}/${selectedLevel.id}`, {
+      const { ok, data } = await adminFetch(`admins/member_level/${selectedLevel.id}`, {
         method: "DELETE",
-        headers: { ...getHeaders(), Accept: "application/json" },
       })
-      if (!res.ok) {
-        if (res.status === 401) {
-          toast({ title: "Session Expired", description: "Mohon login ulang", variant: "destructive" })
-          router.push("/login")
-          return
-        }
-        throw new Error("Delete failed")
-      }
-      const data = await res.json()
-      if (data.success) {
+      if (ok && data.success) {
         toast({
           title: "Berhasil",
           description: data.data.message || "Member Level berhasil dihapus",
@@ -393,6 +346,8 @@ export default function MemberLevelPage() {
         })
       }
     } catch (error) {
+      await logoutAdmin()
+      router.push("/login")
       toast({
         title: "Error",
         description: "Terjadi kesalahan saat menghapus Member Level",

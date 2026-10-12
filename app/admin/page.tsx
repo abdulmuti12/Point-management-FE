@@ -4,6 +4,7 @@ import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Users, ShoppingBag, Package, Tag, Award, UserCheck } from "lucide-react"
+import { adminFetch, logoutAdmin } from "@/lib/auth"
 
 interface DashboardData {
   total_products: number
@@ -23,34 +24,17 @@ export default function DashboardPage() {
   useEffect(() => {
     const fetchDashboardData = async () => {
       try {
-        const token = localStorage.getItem("token")
+        const { ok, data } = await adminFetch("admins/dashboard")
 
-        if (!token) {
-          router.push("/login")
-          return
-        }
-
-        const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/admins/dashboard`, {
-          method: "GET",
-          headers: {
-            Authorization: `Bearer ${token}`,
-            "Content-Type": "application/json",
-          },
-        })
-
-        const data = await response.json()
-
-        if (response.ok && data.success) {
+        if (ok && data.success) {
           setDashboardData(data.data)
         } else {
-          // If API returns success: false or any error, redirect to login
-          localStorage.removeItem("token")
+          await logoutAdmin()
           router.push("/login")
         }
       } catch (error) {
         console.error("Dashboard API error:", error)
-        // On network error, also redirect to login
-        localStorage.removeItem("token")
+        await logoutAdmin()
         router.push("/login")
       } finally {
         setIsLoading(false)

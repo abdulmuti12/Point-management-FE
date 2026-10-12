@@ -9,6 +9,7 @@ import { Skeleton } from "@/components/ui/skeleton"
 import { Separator } from "@/components/ui/separator"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { ArrowLeft, Calendar, Mail, Shield, User, Clock, Info, CheckCircle } from "lucide-react"
+import { adminFetch } from "@/lib/auth"
 
 interface UserData {
   id: number
@@ -33,36 +34,17 @@ export default function AccountPage() {
         setLoading(true)
         setError(null)
 
-        const token = localStorage.getItem("token")
-        if (!token) {
-          router.push("/login")
-          return
-        }
-        // http://127.0.0.1:8000/api/admins/me
-        const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/admins/me`, {
-          method: "GET",
-          headers: {
-            Authorization: `Bearer ${token}`,
-            "Content-Type": "application/json",
-          },
-        })
+        const result = await adminFetch("admins/me")
 
-        const data = await response.json()
-
-        if (!response.ok) {
-          if (response.status === 401) {
-            localStorage.removeItem("token")
-            router.push("/login")
-            return
-          }
-          throw new Error(data.message || "Failed to fetch user data")
+        if (!result.ok) {
+          throw new Error(result.data.message || "Failed to fetch user data")
         }
 
-        if (!data.success) {
-          throw new Error(data.message || "Failed to fetch user data")
+        if (!result.data.success) {
+          throw new Error(result.data.message || "Failed to fetch user data")
         }
 
-        setUserData(data.data)
+        setUserData(result.data.data)
       } catch (err: any) {
         setError(err.message || "An error occurred while fetching user data")
       } finally {

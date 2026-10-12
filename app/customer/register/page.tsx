@@ -17,8 +17,6 @@ import {
   ArrowLeft,
 } from "lucide-react"
 
-const API_BASE_URL = (process.env.NEXT_PUBLIC_API_URL || "").replace(/\/$/, "")
-
 /* ── Google Identity SDK loader ─────────────────────────────── */
 function loadGoogleIdClient(): Promise<void> {
   return new Promise((resolve, reject) => {
@@ -154,7 +152,7 @@ export default function CustomerRegisterPage() {
 
   const [showName, setShowName] = useState(false)
 
-  /* ── manual register → POST /api/customers/register ───────── */
+  /* ── manual register → POST /api/bff/customer/register ───── */
   const handleManualSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setManualLoading(true)
@@ -162,9 +160,10 @@ export default function CustomerRegisterPage() {
     setManualSuccess("")
 
     try {
-      const res = await fetch(`${API_BASE_URL}/customers/register`, {
+      const res = await fetch("/api/bff/customer/register", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
+        credentials: "same-origin",
         body: JSON.stringify({
           name,
           full_name: name,
@@ -201,7 +200,7 @@ export default function CustomerRegisterPage() {
     }
   }
 
-  /* ── Google register → POST /api/customers/social-register-auth ── */
+  /* ── Google register → POST /api/bff/customer/social-register-auth ── */
   const handleGoogleRegister = useCallback(async () => {
     setGoogleLoading(true)
     setGoogleError("")
@@ -232,19 +231,19 @@ export default function CustomerRegisterPage() {
       }
 
       const res = await fetch(
-        `${API_BASE_URL}/customers/social-register-auth`,
+        "/api/bff/customer/social-register-auth",
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
+          credentials: "same-origin",
           body: JSON.stringify({ provider: "google", id_token: idToken }),
         }
       )
       const data = await res.json()
 
-      if (res.ok && data.success && data.data?.token) {
-        localStorage.setItem("customer_token", data.data.token)
-        localStorage.setItem("customer_name", data.data.username || "")
-        localStorage.setItem("customer_email", data.data.email || "")
+      if (res.ok && data.success) {
+        localStorage.setItem("customer_name", data.data?.username || "")
+        localStorage.setItem("customer_email", data.data?.email || "")
         router.push("/customer")
         return
       }

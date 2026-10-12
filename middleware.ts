@@ -1,37 +1,76 @@
-import { NextResponse } from 'next/server'
-import type { NextRequest } from 'next/server'
+import { NextResponse } from "next/server";
+import type { NextRequest } from "next/server";
 
 /**
- * Security headers middleware.
- * Adds HSTS, X-Frame-Options, CSP, X-Content-Type-Options and
- * removes fingerprinting headers exposed by default.
+ * Middleware: security headers + route-level auth guard.
+ *
+ * Auth guard:
+ *   - /admin/*  → requires `admin_auth` HttpOnly cookie
+ *   - /customer/* (excluding /customer/login, /customer/register, /customer/set-password)
+ *                 → requires `customer_auth` HttpOnly cookie
  */
-export function middleware(request: NextRequest) {
-  const response = NextResponse.next()
 
-  // 1. Strict-Transport-Security (HSTS) — enforce HTTPS for 1 year
+const ADMIN_PUBLIC: string[] = ["/login"];
+const CUSTOMER_PUBLIC: string[] = [
+  "/customer/login",
+  "/customer/register",
+  "/customer/set-password",
+];
+
+function hasCookie(request: NextRequest, name: string): boolean {
+  const cookieHeader = request.headers.get("cookie") || "";
+  return cookieHeader.includes(`${name}=`);
+}
+
+export function middleware(request: NextRequest) {
+  const { pathname } = request.nextUrl;
+
+  const response = NextResponse.next();
+
+  /* ── Route-level auth guard ─────────────────────────────────── */
+  if (pathname.startsWith("/admin")) {
+    // The /admin layout client-side check will redirect on load;
+    // middleware adds a server-side gate as a second layer.
+    if (!ADMIN_PUBLIC.some((p) => pathname === p) && !hasCookie(request, "admin_auth")) {
+      return NextResponse.redirect(new URL("/login", request.url));
+    }
+  }
+
+  if (pathname.startsWith("/customer")) {
+    if (
+      !CUSTOMER_PUBLIC.some(
+        (p) => pathname === p || pathname.startsWith(`${p}/`)
+      ) &&
+      !hasCookie(request, "customer_auth")
+    ) {
+      return NextResponse.redirect(new URL("/customer/login", request.url));
+    }
+  }
+
+  /* ── Security headers (applied to all routes) ────────────────── */
+
+  // 1. HSTS — enforce HTTPS
   response.headers.set(
-    'Strict-Transport-Security',
-    'max-age=31536000; includeSubDomains; preload'
-  )
+    "Strict-Transport-Security",
+    "max-age=31536000; includeSubDomains; preload"
+  );
 
   // 2. X-Frame-Options — mitigate clickjacking
-  response.headers.set('X-Frame-Options', 'SAMEORIGIN')
+  response.headers.set("X-Frame-Options", "SAMEORIGIN");
 
   // 3. X-Content-Type-Options — prevent MIME sniffing
-  response.headers.set('X-Content-Type-Options', 'nosniff')
+  response.headers.set("X-Content-Type-Options", "nosniff");
 
   // 4. Referrer-Policy — limit referrer leakage
-  response.headers.set('Referrer-Policy', 'strict-origin-when-cross-origin')
+  response.headers.set("Referrer-Policy", "strict-origin-when-cross-origin");
 
-  // 5. Permissions-Policy — disable powerful features by default
+  // 5. Permissions-Policy — disable powerful features
   response.headers.set(
-    'Permissions-Policy',
-    'camera=(), microphone=(), geolocation=(), interest-cohort=()'
-  )
+    "Permissions-Policy",
+    "camera=(), microphone=(), geolocation=(), interest-cohort=()"
+  );
 
-  // 6. Content-Security-Policy — XSS / data-injection mitigation.
-  //    Adjust img-src / connect-src / frame-src if you load external assets.
+  // 6. CSP — XSS / data-injection mitigation
   const csp = [
     "default-src 'self'",
     "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://accounts.google.com",
@@ -43,19 +82,19 @@ export function middleware(request: NextRequest) {
     "frame-ancestors 'self'",
     "base-uri 'self'",
     "form-action 'self'",
-  ].join('; ')
-  response.headers.set('Content-Security-Policy', csp)
+  ].join("; ");
+  response.headers.set("Content-Security-Policy", csp);
 
-  // 7. Strip fingerprinting headers added by Next.js / proxies
-  response.headers.delete('X-Powered-By')
-  response.headers.delete('Server')
+  // 7. Strip fingerprinting headers
+  response.headers.delete("X-Powered-By");
+  response.headers.delete("Server");
 
-  return response
+  return response;
 }
 
 export const config = {
-  // Run on every route except static assets and Next.js internals
+  // Exclude Next.js internals and static assets from the matcher
   matcher: [
-    '/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico|css|js)$).*)',
+    "/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico|css|js)$).*)",
   ],
-}
+};

@@ -73,6 +73,8 @@ interface ToastNotification {
   message: string
 }
 
+import { adminFetch } from "@/lib/auth"
+
 const STATUS_STYLES: Record<ClaimStatus, { label: string; className: string; icon: typeof Clock }> = {
   waiting:   { label: "Menunggu",    className: "bg-blue-100 text-blue-700 border-blue-200",    icon: Clock },
   approved:  { label: "Disetujui",   className: "bg-green-100 text-green-700 border-green-200", icon: CheckCircle2 },
@@ -116,12 +118,6 @@ export default function GiftApprovalPage() {
   const [detailClaim, setDetailClaim] = useState<GiftClaim | null>(null)
 
   const fetchClaims = useCallback(async (page = 1, status: "all" | ClaimStatus = statusFilter, search = searchValue) => {
-    const token = typeof window !== "undefined" ? localStorage.getItem("token") : null
-    if (!token) {
-      addToast("error", "Auth", "Token tidak ditemukan, silakan login ulang.")
-      setIsLoading(false)
-      return
-    }
     try {
       setIsLoading(true)
       const params = new URLSearchParams()
@@ -129,22 +125,9 @@ export default function GiftApprovalPage() {
       if (status !== "all") params.append("status", status)
       if (search.trim()) params.append("search", search.trim())
 
-      const url = `${process.env.NEXT_PUBLIC_API_URL}/admins/gift-claims?${params.toString()}`
-      const res = await fetch(url, {
-        method: "GET",
-        headers: {
-          Authorization: `Bearer ${token}`,
-          "Content-Type": "application/json",
-        },
-      })
-      if (res.status === 401) {
-        localStorage.removeItem("token")
-        addToast("error", "Auth", "Sesi berakhir, silakan login ulang.")
-        return
-      }
-      const data = await res.json()
-      if (!res.ok || data.success === false) {
-        addToast("error", "Gagal memuat", data?.message || `HTTP ${res.status}`)
+      const { ok, status: resStatus, data } = await adminFetch(`admins/gift-claims?${params.toString()}`)
+      if (!ok || data.success === false) {
+        addToast("error", "Gagal memuat", data?.message || `HTTP ${resStatus}`)
         setClaims([])
         return
       }
@@ -227,30 +210,18 @@ export default function GiftApprovalPage() {
   const submitAction = async () => {
     const { claim, action } = actionModal
     if (!claim || !action) return
-    const token = localStorage.getItem("token")
-    if (!token) {
-      addToast("error", "Auth", "Token tidak ditemukan.")
-      return
-    }
     setIsSubmittingAction(true)
     setActionError(null)
     try {
-      const url = `${process.env.NEXT_PUBLIC_API_URL}/admins/gift-claims/${claim.id}/${action}`
-      const res = await fetch(url, {
+      const { ok, status: resStatus, data } = await adminFetch(`admins/gift-claims/${claim.id}/${action}`, {
         method: "POST",
-        headers: {
-          Authorization: `Bearer ${token}`,
-          "Content-Type": "application/json",
-          Accept: "application/json",
-        },
         body: JSON.stringify({ admin_note: adminNote.trim() || undefined }),
       })
-      const data = await res.json()
-      if (!res.ok || data.success === false) {
+      if (!ok || data.success === false) {
         const msg =
           data?.message ||
           (data?.errors ? Object.values(data.errors as Record<string, string[]>).flat().join(" ") : "") ||
-          `HTTP ${res.status}`
+          `HTTP ${resStatus}`
         throw new Error(msg)
       }
       const actionLabel =

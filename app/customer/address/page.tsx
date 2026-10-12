@@ -1,10 +1,8 @@
 "use client"
 
 import { useEffect, useState } from "react"
-import { useRouter } from "next/navigation"
 import { MapPin, Plus, X, Pencil, Trash2, Loader2 } from "lucide-react"
-
-const API_BASE_URL = (process.env.NEXT_PUBLIC_API_URL || "").replace(/\/$/, "")
+import { customerFetch } from "@/lib/auth"
 
 type AddressText = {
   id: string
@@ -14,8 +12,6 @@ type AddressText = {
 }
 
 export default function CustomerAddressPage() {
-  const router = useRouter()
-
   const [addresses, setAddresses] = useState<AddressText[]>([])
   const [loading, setLoading] = useState(true)
 
@@ -24,17 +20,12 @@ export default function CustomerAddressPage() {
   const [editingId, setEditingId] = useState<string | null>(null)
   const [submitting, setSubmitting] = useState(false)
 
-  const token = localStorage.getItem("customer_token")
-
   async function fetchAddresses() {
     setLoading(true)
     try {
-      const res = await fetch(`${API_BASE_URL}/customers/get-address-texts`, {
-        headers: { Authorization: `Bearer ${token}` },
-      })
-      if (!res.ok) throw new Error()
-      const json = await res.json()
-      setAddresses(json.data || [])
+      const { ok, data } = await customerFetch("get-address-texts")
+      if (!ok) throw new Error()
+      setAddresses(data.data || [])
     } catch {
       setAddresses([])
     } finally {
@@ -43,10 +34,6 @@ export default function CustomerAddressPage() {
   }
 
   useEffect(() => {
-    if (!localStorage.getItem("customer_token")) {
-      router.push("/customer/login")
-      return
-    }
     fetchAddresses()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
@@ -57,21 +44,13 @@ export default function CustomerAddressPage() {
     setSubmitting(true)
     try {
       if (editingId) {
-        await fetch(`${API_BASE_URL}/customers/update-address-text`, {
+        await customerFetch("update-address-text", {
           method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${token}`,
-          },
           body: JSON.stringify({ id: editingId, ...form }),
         })
       } else {
-        await fetch(`${API_BASE_URL}/customers/create-address-text`, {
+        await customerFetch("create-address-text", {
           method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${token}`,
-          },
           body: JSON.stringify(form),
         })
       }
@@ -86,12 +65,8 @@ export default function CustomerAddressPage() {
 
   async function handleToggle(id: string) {
     try {
-      await fetch(`${API_BASE_URL}/customers/toggle-address-text-status`, {
+      await customerFetch("toggle-address-text-status", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
         body: JSON.stringify({ id }),
       })
       await fetchAddresses()
@@ -101,12 +76,8 @@ export default function CustomerAddressPage() {
   async function handleDelete(id: string) {
     if (!confirm("Hapus alamat ini?")) return
     try {
-      await fetch(`${API_BASE_URL}/customers/delete-address-text`, {
+      await customerFetch("delete-address-text", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
         body: JSON.stringify({ id }),
       })
       await fetchAddresses()

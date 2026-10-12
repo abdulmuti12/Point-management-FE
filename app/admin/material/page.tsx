@@ -36,14 +36,13 @@ import {
   ImageIcon,
 } from "lucide-react"
 import { Alert, AlertDescription } from "@/components/ui/alert"
+import { adminFetch, logoutAdmin } from "@/lib/auth"
+import type { Material } from "@/lib/types"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 
-interface MaterialData {
-  id: number
-  name: string
+interface MaterialData extends Material {
   description: string | null
-  file: string | null
   created_at: string
   updated_at: string
 }
@@ -248,15 +247,6 @@ export default function MaterialPage() {
   // Fetch materials data from API
   const fetchMaterials = async (page = 1, value = "") => {
     try {
-      const token = localStorage.getItem("token")
-
-      if (!token) {
-        setApiError("No authentication token found. Please login.")
-        setIsLoading(false)
-        setIsSearching(false)
-        return
-      }
-
       setIsSearching(true)
       setApiError("")
 
@@ -266,43 +256,12 @@ export default function MaterialPage() {
         params.append("name", value.trim())
       }
 
-      // const url = `http://127.0.0.1:8000/api/admins/made${params.toString() ? `?${params.toString()}` : ""}`
-      const apiBase = (process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000/api").replace(/\/$/, "")
-      const url = `${apiBase}/admins/made${params.toString() ? `?${params.toString()}` : ""}`
+      const endpoint = `admins/made${params.toString() ? `?${params.toString()}` : ""}`
 
-      console.log("Fetching materials from:", url)
+      const result = await adminFetch(endpoint)
+      const responseData: any = result.data
 
-      const response = await fetch(url, {
-        method: "GET",
-        headers: {
-          Authorization: `Bearer ${token}`,
-          "Content-Type": "application/json",
-        },
-      })
-
-      console.log("Response status:", response.status)
-
-      // Only redirect to login if we get a 401 Unauthorized
-      if (response.status === 401) {
-        console.log("Unauthorized access, redirecting to login")
-        localStorage.removeItem("token")
-        router.push("/login")
-        return
-      }
-
-      let responseData: any
-      try {
-        responseData = await response.json()
-        console.log("API Response:", responseData)
-      } catch (parseError) {
-        console.error("Failed to parse JSON response:", parseError)
-        setApiError(`Failed to parse server response. Status: ${response.status}`)
-        setMaterials([])
-        return
-      }
-
-      if (response.ok) {
-        // Check if response has success field and it's false
+      if (result.ok) {
         if (responseData.success === false) {
           setApiError(responseData.message || "API returned success: false")
           addToast("error", "Error", responseData.message || "Failed to fetch materials")
@@ -313,7 +272,6 @@ export default function MaterialPage() {
           return
         }
 
-        // Extract data from the correct structure: data.data.data
         if (
           responseData.data &&
           responseData.data.data &&
@@ -321,41 +279,26 @@ export default function MaterialPage() {
           Array.isArray(responseData.data.data.data)
         ) {
           const materialsList = responseData.data.data.data
-          console.log("Raw materials data:", materialsList)
-
-          // Log file paths for debugging
-          materialsList.forEach((material: MaterialData) => {
-            console.log(`Material ${material.id} - ${material.name}:`, {
-              originalFile: material.file,
-              processedImageUrl: getImageUrl(material.file),
-            })
-          })
-
           setMaterials(materialsList)
           setCurrentPage(responseData.data.meta.current_page)
           setTotalPages(responseData.data.meta.last_page)
           setTotalItems(responseData.data.meta.total)
-          console.log("Materials loaded successfully:", materialsList.length, "materials")
         } else {
-          console.error("Unexpected API response structure:", responseData)
           setApiError(
             `Unexpected data format from server. Expected array of materials but got: ${typeof responseData.data}`,
           )
           setMaterials([])
         }
       } else {
-        // Handle error response
-        const errorMessage = responseData?.message || `HTTP ${response.status}: ${response.statusText}`
+        const errorMessage = responseData?.message || `HTTP ${result.status}`
         setApiError(errorMessage)
         addToast("error", "API Error", errorMessage)
         setMaterials([])
-        console.error("API Error:", errorMessage)
       }
     } catch (error) {
       console.error("Network error:", error)
-      const errorMessage = error instanceof Error ? error.message : "Unknown network error"
-      setApiError(`Network error: ${errorMessage}`)
-      addToast("error", "Network Error", "Failed to connect to server. Please check your connection.")
+      await logoutAdmin()
+      router.push("/login")
       setMaterials([])
     } finally {
       setIsLoading(false)
@@ -469,56 +412,25 @@ export default function MaterialPage() {
   // Create material function
   const createMaterial = async () => {
     try {
-      const token = localStorage.getItem("token")
-
-      if (!token) {
-        setCreateMessage("Authentication token not found. Please login again.")
-        router.push("/login")
-        return
-      }
-
       setIsCreatingMaterial(true)
       setCreateMessage("")
 
-      // Create FormData for file upload
       const formData = new FormData()
       formData.append("name", newMaterial.name)
       formData.append("description", newMaterial.description)
 
-      // Only append file if it exists
       if (newMaterial.file) {
         formData.append("file", newMaterial.file)
-        console.log("File being uploaded:", newMaterial.file.name, newMaterial.file.type, newMaterial.file.size)
       }
 
-      console.log("FormData contents:")
-      for (const [key, value] of formData.entries()) {
-        console.log(key, value)
-      }
-
-      const apiBase = (process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000/api").replace(/\/$/, "")
-      const url = `${apiBase}/admins/made`
-      const response = await fetch(url, {
+      const result = await adminFetch("admins/made", {
         method: "POST",
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
         body: formData,
       })
 
+      const data = result.data
 
-      console.log("Create response status:", response.status)
-      const data = await response.json()
-      console.log("Create response data:", data)
-
-      if (response.status === 401) {
-        setCreateMessage("Authentication failed. Please login again.")
-        localStorage.removeItem("token")
-        router.push("/login")
-        return
-      }
-
-      if (response.ok && data.success) {
+      if (result.ok && data.success) {
         addToast("success", "Material Created", `Material "${newMaterial.name}" has been successfully created.`)
         setNewMaterial({
           name: "",
@@ -535,10 +447,12 @@ export default function MaterialPage() {
           setCreateMessage("")
         }, 2000)
       } else {
-        setCreateMessage(data.message || `Failed to create material (Status: ${response.status})`)
+        setCreateMessage(data.message || `Failed to create material (Status: ${result.status})`)
       }
     } catch (error) {
       console.error("Create material API error:", error)
+      await logoutAdmin()
+      router.push("/login")
       setCreateMessage("Network error occurred while creating material")
     } finally {
       setIsCreatingMaterial(false)
@@ -564,39 +478,16 @@ export default function MaterialPage() {
     if (!materialToDelete) return
 
     try {
-      const token = localStorage.getItem("token")
-
-      if (!token) {
-        setDeleteMessage("Authentication token not found. Please login again.")
-        router.push("/login")
-        return
-      }
-
       setIsDeletingMaterial(true)
       setDeleteMessage("")
 
-       const apiBase = (process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000/api").replace(/\/$/, "")
-      const url = `${apiBase}/admins/made/${materialToDelete.id}`
-
-      const response = await fetch(url, {
+      const result = await adminFetch(`admins/made/${materialToDelete.id}`, {
         method: "DELETE",
-        headers: {
-          Authorization: `Bearer ${token}`,
-          "Content-Type": "application/json",
-        },
       })
 
+      const data = result.data
 
-      const data = await response.json()
-
-      if (response.status === 401) {
-        setDeleteMessage("Authentication failed. Please login again.")
-        localStorage.removeItem("token")
-        router.push("/login")
-        return
-      }
-
-      if (response.ok && data.success) {
+      if (result.ok && data.success) {
         addToast("success", "Material Deleted", `Material "${materialToDelete.name}" has been successfully deleted.`)
         fetchMaterials(currentPage, searchValue)
         setTimeout(() => {
@@ -605,10 +496,12 @@ export default function MaterialPage() {
           setDeleteMessage("")
         }, 1500)
       } else {
-        setDeleteMessage(data.message || `Failed to delete material (Status: ${response.status})`)
+        setDeleteMessage(data.message || `Failed to delete material (Status: ${result.status})`)
       }
     } catch (error) {
       console.error("Delete material API error:", error)
+      await logoutAdmin()
+      router.push("/login")
       setDeleteMessage("Network error occurred while deleting material")
     } finally {
       setIsDeletingMaterial(false)
@@ -631,64 +524,26 @@ export default function MaterialPage() {
     setIsLoadingEditData(true)
 
     try {
-      const token = localStorage.getItem("token")
+      const result = await adminFetch(`admins/made-edit/${material.id}`)
+      const data = result.data
 
-      if (!token) {
-        setEditMessage("Authentication token not found. Please login again.")
-        router.push("/login")
-        return
-      }
-
-      // const response = await fetch(`http://127.0.0.1:8000/api/admins/made-edit/${material.id}`, {
-      //   method: "GET",
-      //   headers: {
-      //     Authorization: `Bearer ${token}`,
-      //     "Content-Type": "application/json",
-      //   },
-      // })
-      const apiBase = (process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000/api").replace(/\/$/, "")
-     const url = `${apiBase}/admins/made-edit/${material.id}`
-
-      const response = await fetch(url, {
-         method: "GET",
-         headers: {
-           Authorization: `Bearer ${token}`,
-           "Content-Type": "application/json",
-         },
-       })
-
-      const data = await response.json()
-
-      if (response.status === 401) {
-        setEditMessage("Authentication failed. Please login again.")
-        localStorage.removeItem("token")
-        router.push("/login")
-        return
-      }
-
-      if (response.ok && data.success) {
+      if (result.ok && data.success) {
         setEditMaterial({
           name: data.data.name || "",
           description: data.data.description || "",
-          file: null, // Always start with null for new file selection
+          file: null,
         })
 
-        // Set existing image preview if available
         const existingImageUrl = getImageUrl(data.data.file)
         setOriginalEditImageUrl(existingImageUrl)
         setEditImagePreview(existingImageUrl)
-
-        console.log("Edit data loaded:", {
-          name: data.data.name,
-          description: data.data.description,
-          file: data.data.file,
-          imageUrl: existingImageUrl,
-        })
       } else {
-        setEditMessage(data.message || `Failed to load material data (Status: ${response.status})`)
+        setEditMessage(data.message || `Failed to load material data (Status: ${result.status})`)
       }
     } catch (error) {
       console.error("Load material data API error:", error)
+      await logoutAdmin()
+      router.push("/login")
       setEditMessage("Network error occurred while loading material data")
     } finally {
       setIsLoadingEditData(false)
@@ -717,84 +572,26 @@ export default function MaterialPage() {
     if (!materialToEdit) return
 
     try {
-      const token = localStorage.getItem("token")
-
-      if (!token) {
-        setEditMessage("Authentication token not found. Please login again.")
-        router.push("/login")
-        return
-      }
-
       setIsEditingMaterial(true)
       setEditMessage("")
 
-      // Create FormData for file upload
       const formData = new FormData()
       formData.append("name", editMaterial.name.trim())
       formData.append("description", editMaterial.description.trim())
-
-      // Add method spoofing for Laravel
       formData.append("_method", "PUT")
 
-      // Always append file field, even if null
       if (editMaterial.file) {
         formData.append("file", editMaterial.file)
-        console.log("New file being uploaded for edit:", {
-          name: editMaterial.file.name,
-          type: editMaterial.file.type,
-          size: editMaterial.file.size,
-        })
-      } else {
-        console.log("No new file selected for update")
       }
 
-      // Debug FormData contents
-      console.log("Update FormData contents:")
-      for (const [key, value] of formData.entries()) {
-        if (value instanceof File) {
-          console.log(`${key}:`, {
-            name: value.name,
-            type: value.type,
-            size: value.size,
-          })
-        } else {
-          console.log(`${key}:`, value)
-        }
-      }
-
-      const apiBase = (process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000/api").replace(/\/$/, "")
-      const url = `${apiBase}/admins/made/${materialToEdit.id}`
-
-      const response = await fetch(url, {
-        method: "POST", // Use POST with _method for Laravel file uploads
-        headers: {
-          Authorization: `Bearer ${token}`,
-          // Don't set Content-Type for FormData - let browser set it with boundary
-        },
+      const result = await adminFetch(`admins/made/${materialToEdit.id}`, {
+        method: "POST",
         body: formData,
       })
 
+      const data = result.data
 
-      console.log("Update response status:", response.status)
-
-      let data: any
-      try {
-        data = await response.json()
-        console.log("Update response data:", data)
-      } catch (parseError) {
-        console.error("Failed to parse update response:", parseError)
-        setEditMessage("Failed to parse server response")
-        return
-      }
-
-      if (response.status === 401) {
-        setEditMessage("Authentication failed. Please login again.")
-        localStorage.removeItem("token")
-        router.push("/login")
-        return
-      }
-
-      if (response.ok && data.success) {
+      if (result.ok && data.success) {
         addToast("success", "Material Updated", `Material "${editMaterial.name}" has been successfully updated.`)
         fetchMaterials(currentPage, searchValue)
         setTimeout(() => {
@@ -810,12 +607,12 @@ export default function MaterialPage() {
           setOriginalEditImageUrl(null)
         }, 2000)
       } else {
-        const errorMessage = data?.message || `Failed to update material (Status: ${response.status})`
-        setEditMessage(errorMessage)
-        console.error("Update failed:", errorMessage)
+        setEditMessage(data?.message || `Failed to update material (Status: ${result.status})`)
       }
     } catch (error) {
       console.error("Update material API error:", error)
+      await logoutAdmin()
+      router.push("/login")
       setEditMessage("Network error occurred while updating material")
     } finally {
       setIsEditingMaterial(false)
@@ -1126,7 +923,6 @@ export default function MaterialPage() {
                                 alt={material.name}
                                 className="w-full h-full object-cover"
                                 onError={(e) => {
-                                  console.log(`Failed to load image for ${material.name}:`, imageUrl)
                                   const target = e.target as HTMLImageElement
                                   target.style.display = "none"
                                   const nextSibling = target.nextElementSibling as HTMLElement
@@ -1155,7 +951,6 @@ export default function MaterialPage() {
                               alt={material.name}
                               className="w-full h-full object-cover"
                               onError={(e) => {
-                                console.log(`Failed to load table image for ${material.name}:`, imageUrl)
                                 const target = e.target as HTMLImageElement
                                 target.style.display = "none"
                                 const parent = target.parentElement

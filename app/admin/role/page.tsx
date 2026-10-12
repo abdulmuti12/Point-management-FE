@@ -3,7 +3,6 @@
 import { DialogTrigger } from "@/components/ui/dialog"
 
 import { useState, useEffect } from "react"
-import { useRouter } from "next/navigation"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -36,6 +35,7 @@ import {
   Settings,
 } from "lucide-react"
 import { Alert, AlertDescription } from "@/components/ui/alert"
+import { adminFetch } from "@/lib/auth"
 
 interface RoleData {
   id: number
@@ -138,7 +138,6 @@ export default function RolePage() {
     name: "",
   })
   const [apiError, setApiError] = useState("")
-  const router = useRouter()
 
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false)
   const [roleToDelete, setRoleToDelete] = useState<RoleData | null>(null)
@@ -181,15 +180,6 @@ export default function RolePage() {
   // Fetch roles data from API
   const fetchRoles = async (page = 1, value = "") => {
     try {
-      const token = localStorage.getItem("token")
-
-      if (!token) {
-        setApiError("No authentication token found. Please login.")
-        setIsLoading(false)
-        setIsSearching(false)
-        return
-      }
-
       setIsSearching(true)
       setApiError("")
 
@@ -199,43 +189,12 @@ export default function RolePage() {
         params.append("name", value.trim())
       }
 
-      const url = `${process.env.NEXT_PUBLIC_API_URL}/admins/role${params.toString() ? `?${params.toString()}` : ""}`
+      const endpoint = `admins/role${params.toString() ? `?${params.toString()}` : ""}`
 
-      console.log("Fetching roles from:", url)
-      console.log("Using token:", token ? "Token exists" : "No token")
+      const result = await adminFetch(endpoint)
+      const responseData: any = result.data
 
-      const response = await fetch(url, {
-        method: "GET",
-        headers: {
-          Authorization: `Bearer ${token}`,
-          "Content-Type": "application/json",
-        },
-      })
-
-      console.log("Response status:", response.status)
-      console.log("Response headers:", Object.fromEntries(response.headers.entries()))
-
-      // Only redirect to login if we get a 401 Unauthorized
-      if (response.status === 401) {
-        console.log("Unauthorized access, redirecting to login")
-        localStorage.removeItem("token")
-        router.push("/login")
-        return
-      }
-
-      let responseData: any
-      try {
-        responseData = await response.json()
-        console.log("API Response:", responseData)
-      } catch (parseError) {
-        console.error("Failed to parse JSON response:", parseError)
-        setApiError(`Failed to parse server response. Status: ${response.status}`)
-        setRoles([])
-        return
-      }
-
-      if (response.ok) {
-        // Check if response has success field and it's false
+      if (result.ok) {
         if (responseData.success === false) {
           setApiError(responseData.message || "API returned success: false")
           addToast("error", "Error", responseData.message || "Failed to fetch roles")
@@ -246,35 +205,28 @@ export default function RolePage() {
           return
         }
 
-        // Extract data from the correct structure
         if (responseData.data && responseData.data.data && Array.isArray(responseData.data.data)) {
           const rolesList = responseData.data.data
           setRoles(rolesList)
           setCurrentPage(responseData.meta.current_page)
           setTotalPages(responseData.meta.last_page)
           setTotalItems(responseData.meta.total)
-          console.log("Roles loaded successfully:", rolesList.length, "roles")
         } else if (responseData.data && Array.isArray(responseData.data)) {
-          // Fallback: if data is directly an array
           setRoles(responseData.data)
           setCurrentPage(1)
           setTotalPages(1)
           setTotalItems(responseData.data.length)
-          console.log("Roles loaded (fallback):", responseData.data.length, "roles")
         } else {
-          console.error("Unexpected API response structure:", responseData)
           setApiError(
             `Unexpected data format from server. Expected array of roles but got: ${typeof responseData.data}`,
           )
           setRoles([])
         }
       } else {
-        // Handle error response
-        const errorMessage = responseData?.message || `HTTP ${response.status}: ${response.statusText}`
+        const errorMessage = responseData?.message || `HTTP ${result.status}`
         setApiError(errorMessage)
         addToast("error", "API Error", errorMessage)
         setRoles([])
-        console.error("API Error:", errorMessage)
       }
     } catch (error) {
       console.error("Network error:", error)
@@ -291,35 +243,14 @@ export default function RolePage() {
   // Fetch role detail
   const fetchRoleDetail = async (roleId: number) => {
     try {
-      const token = localStorage.getItem("token")
-
-      if (!token) {
-        router.push("/login")
-        return
-      }
-
       setIsLoadingDetail(true)
       setDetailError("")
       setRoleDetail(null)
 
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/admins/role/${roleId}`, {
-        method: "GET",
-        headers: {
-          Authorization: `Bearer ${token}`,
-          "Content-Type": "application/json",
-        },
-      })
+      const result = await adminFetch(`admins/role/${roleId}`)
+      const data = result.data
 
-      // Only redirect to login if we get a 401 Unauthorized
-      if (response.status === 401) {
-        localStorage.removeItem("token")
-        router.push("/login")
-        return
-      }
-
-      const data = await response.json()
-
-      if (response.ok && data.success) {
+      if (result.ok && data.success) {
         setRoleDetail(data.data)
       } else {
         setDetailError(data.message || "Failed to load role details")
@@ -335,34 +266,13 @@ export default function RolePage() {
   // Create new role
   const fetchMenuItems = async () => {
     try {
-      const token = localStorage.getItem("token")
-
-      if (!token) {
-        setMenuError("Authentication token not found. Please login again.")
-        return
-      }
-
       setIsLoadingMenus(true)
       setMenuError("")
 
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/admins/get-menu`, {
-        method: "GET",
-        headers: {
-          Authorization: `Bearer ${token}`,
-          "Content-Type": "application/json",
-        },
-      })
+      const result = await adminFetch("admins/get-menu")
+      const data = result.data
 
-      if (response.status === 401) {
-        setMenuError("Authentication failed. Please login again.")
-        localStorage.removeItem("token")
-        router.push("/login")
-        return
-      }
-
-      const data = await response.json()
-
-      if (response.ok && data.success) {
+      if (result.ok && data.success) {
         setMenuItems(data.data)
       } else {
         setMenuError(data.message || "Failed to load menu items")
@@ -377,59 +287,32 @@ export default function RolePage() {
 
   const createRole = async () => {
     try {
-      const token = localStorage.getItem("token")
-
-      if (!token) {
-        setCreateMessage("Authentication token not found. Please login again.")
-        router.push("/login")
-        return
-      }
-
       setIsCreatingRole(true)
       setCreateMessage("")
 
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/admins/role`, {
+      const result = await adminFetch("admins/role", {
         method: "POST",
-        headers: {
-          Authorization: `Bearer ${token}`,
-          "Content-Type": "application/json",
-          Accept: "application/json",
-        },
         body: JSON.stringify({
           name: newRole.name,
-          menus: selectedMenus, // Include selected menus
+          menus: selectedMenus,
         }),
       })
 
-      const data = await response.json()
+      const data = result.data
 
-      if (response.status === 401) {
-        setCreateMessage("Authentication failed. Please login again.")
-        localStorage.removeItem("token")
-        router.push("/login")
-        return
-      }
-
-      if (response.ok && data.success) {
-        // Show success toast
+      if (result.ok && data.success) {
         addToast("success", "Role Created", `Role "${newRole.name}" has been successfully created.`)
-
-        // Reset form
         setNewRole({
           name: "",
         })
         setSelectedMenus([])
-
-        // Refresh role list
         fetchRoles(currentPage, searchValue)
-
-        // Close dialog after a short delay
         setTimeout(() => {
           setIsAddDialogOpen(false)
           setCreateMessage("")
         }, 2000)
       } else {
-        setCreateMessage(data.message || `Failed to create role (Status: ${response.status})`)
+        setCreateMessage(data.message || `Failed to create role (Status: ${result.status})`)
       }
     } catch (error) {
       console.error("Create role API error:", error)
@@ -554,43 +437,18 @@ export default function RolePage() {
   // Update role
   const fetchRoleForEdit = async (roleId: number) => {
     try {
-      const token = localStorage.getItem("token")
-
-      if (!token) {
-        setEditMessage("Authentication token not found. Please login again.")
-        router.push("/login")
-        return
-      }
-
       setIsLoadingEditData(true)
       setEditMessage("")
 
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/admins/get-edit-role/${roleId}`, {
-        method: "GET",
-        headers: {
-          Authorization: `Bearer ${token}`,
-          "Content-Type": "application/json",
-        },
-      })
+      const result = await adminFetch(`admins/get-edit-role/${roleId}`)
+      const data = result.data
 
-      if (response.status === 401) {
-        setEditMessage("Authentication failed. Please login again.")
-        localStorage.removeItem("token")
-        router.push("/login")
-        return
-      }
-
-      const data = await response.json()
-
-      if (response.ok && data.success) {
+      if (result.ok && data.success) {
         setEditRoleData(data.data)
-
-        // Set selected menus based on the response
         const initialSelectedMenus = data.data.menus.filter((menu) => menu.selected).map((menu) => menu.id)
-
         setSelectedEditMenus(initialSelectedMenus)
       } else {
-        setEditMessage(data.message || `Failed to load role data (Status: ${response.status})`)
+        setEditMessage(data.message || `Failed to load role data (Status: ${result.status})`)
       }
     } catch (error) {
       console.error("Fetch role for edit API error:", error)
@@ -613,14 +471,6 @@ export default function RolePage() {
 
   const updateRole = async (roleId: number) => {
     try {
-      const token = localStorage.getItem("token")
-
-      if (!token) {
-        setEditMessage("Authentication token not found. Please login again.")
-        router.push("/login")
-        return
-      }
-
       setIsEditingRole(true)
       setEditMessage("")
 
@@ -629,13 +479,8 @@ export default function RolePage() {
         return
       }
 
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/admins/role/${roleId}`, {
+      const result = await adminFetch(`admins/role/${roleId}`, {
         method: "POST",
-        headers: {
-          Authorization: `Bearer ${token}`,
-          "Content-Type": "application/json",
-          Accept: "application/json",
-        },
         body: JSON.stringify({
           name: editRoleData.name,
           menus: selectedEditMenus,
@@ -643,21 +488,11 @@ export default function RolePage() {
         }),
       })
 
-      const data = await response.json()
+      const data = result.data
 
-      if (response.status === 401) {
-        setEditMessage("Authentication failed. Please login again.")
-        localStorage.removeItem("token")
-        router.push("/login")
-        return
-      }
-
-      if (response.ok && data.success) {
-        // Show success toast
+      if (result.ok && data.success) {
         addToast("success", "Role Updated", "Update Role Success")
-        // Refresh role list
         fetchRoles(currentPage, searchValue)
-        // Close dialog after a short delay
         setTimeout(() => {
           setIsEditDialogOpen(false)
           setSelectedRole(null)
@@ -666,7 +501,7 @@ export default function RolePage() {
           setSelectedEditMenus([])
         }, 1000)
       } else {
-        setEditMessage(data.message || `Failed to update role (Status: ${response.status})`)
+        setEditMessage(data.message || `Failed to update role (Status: ${result.status})`)
       }
     } catch (error) {
       console.error("Update role API error:", error)
@@ -687,42 +522,20 @@ export default function RolePage() {
   // Delete role
   const deleteRole = async (roleId: number, roleName: string) => {
     try {
-      const token = localStorage.getItem("token")
-
-      if (!token) {
-        router.push("/login")
-        return
-      }
-
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/admins/role/${roleId}`, {
+      const result = await adminFetch(`admins/role/${roleId}`, {
         method: "DELETE",
-        headers: {
-          Authorization: `Bearer ${token}`,
-          "Content-Type": "application/json",
-          Accept: "application/json",
-        },
       })
 
-      const data = await response.json()
+      const data = result.data
 
-      if (response.status === 401) {
-        localStorage.removeItem("token")
-        router.push("/login")
-        return
-      }
-
-      if (response.ok && data.success) {
-        // Show success toast
+      if (result.ok && data.success) {
         addToast("success", "Role Deleted", `Role "${roleName}" has been successfully deleted.`)
-        // Refresh role list after successful deletion
         fetchRoles(currentPage, searchValue)
       } else {
-        // Show error toast
         addToast("error", "Delete Failed", data.message || "Failed to delete role. Please try again.")
       }
     } catch (error) {
       console.error("Delete role API error:", error)
-      // Show error toast for network errors
       addToast("error", "Network Error", "A network error occurred while deleting the role. Please try again.")
     }
   }

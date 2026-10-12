@@ -8,8 +8,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Eye, EyeOff, Loader2, Lock, Mail } from "lucide-react"
 import { motion, AnimatePresence } from "motion/react"
-
-const API_BASE_URL = (process.env.NEXT_PUBLIC_API_URL || "").replace(/\/$/, "")
+import { checkAuth } from "@/lib/auth"
 
 /* ── Motion variants ─────────────────────────────────────────── */
 const formVariants = {
@@ -33,9 +32,7 @@ const inputVariants = {
 /* ── helpers ─────────────────────────────────────────────────── */
 const STORAGE_BASE_URL = process.env.NEXT_PUBLIC_STORAGE_URL
   ? `${process.env.NEXT_PUBLIC_STORAGE_URL.replace(/\/$/, "")}/`
-  : API_BASE_URL
-    ? `${API_BASE_URL.replace(/\/api$/, "")}/storage/`
-    : "http://127.0.0.1:8000/storage/"
+  : "http://127.0.0.1:8000/storage/"
 
 /* ── helpers ─────────────────────────────────────────────────── */
 function resolveLogoUrl(filePath: string) {
@@ -164,7 +161,8 @@ export default function CustomerLoginPage() {
   useEffect(() => {
     const fetchLogo = async () => {
       try {
-        const res = await fetch(`${API_BASE_URL}/admins/active-logo`)
+        const apiBase = (process.env.NEXT_PUBLIC_API_URL || "").replace(/\/$/, "")
+        const res = await fetch(`${apiBase}/admins/active-logo`)
         const data = await res.json()
         if (data.success && data.data?.image)
           setLogoUrl(resolveLogoUrl(data.data.image))
@@ -177,26 +175,30 @@ export default function CustomerLoginPage() {
 
   /* Auto-redirect if customer already authenticated */
   useEffect(() => {
-    if (localStorage.getItem("customer_token")) router.push("/customer")
+    const verify = async () => {
+      try {
+        const result = await checkAuth()
+        if (result.authenticated && result.role === "customer") router.push("/customer")
+      } catch {}
+    }
+    verify()
   }, [router])
 
   const imgError = () => setLogoUrl(null)
 
   /* ── store customer session ───────────────────────────────── */
   const storeSession = (data: {
-    token?: string
     username?: string
     email?: string
   }) => {
-    if (data.token) localStorage.setItem("customer_token", data.token)
     if (data.username) localStorage.setItem("customer_name", data.username)
     if (data.email) localStorage.setItem("customer_email", data.email)
     router.push("/customer")
   }
 
-  /* ── manual login → POST /api/customers/login-customer ──────
+  /* ── manual login → POST /api/bff/customer/login ───
      Response:
-       success: { success: true, data: { id, username, email, token } }
+       success: { success: true, data: { id, username, email } }
        401:     { success: false, message: "Invalid credentials" }
        403:     { success: false, needs_password_setup: true,
                  setup_token, email, message }
@@ -207,9 +209,10 @@ export default function CustomerLoginPage() {
     setError("")
 
     try {
-      const res = await fetch(`${API_BASE_URL}/customers/login-customer`, {
+      const res = await fetch("/api/bff/customer/login", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
+        credentials: "same-origin",
         body: JSON.stringify({ email, password }),
       })
 
@@ -217,7 +220,6 @@ export default function CustomerLoginPage() {
 
       if (res.ok && data.success) {
         storeSession({
-          token: data.data?.token,
           username: data.data?.username,
           email: data.data?.email,
         })
@@ -225,8 +227,8 @@ export default function CustomerLoginPage() {
       }
 
       // 403 — needs password setup
-      if (data.needs_password_setup && data.setup_token) {
-        localStorage.setItem("setup_token", data.setup_token)
+      if (data.needs_password_setup) {
+        localStorage.setItem("setup_token", data.setup_token || "")
         localStorage.setItem("setup_email", data.email || email)
         router.push("/customer/set-password")
         return
@@ -245,9 +247,9 @@ export default function CustomerLoginPage() {
        1. Load Google Identity SDK
        2. Show sign-in popup → user authorize
        3. SDK returns { credential: id_token }
-       4. POST /api/customers/social-login { provider: "google", id_token }
-       5. If account not registered → POST /api/customers/social-register-auth
-       6. Store customer_token from response
+       4. POST /api/bff/customer/social-login { provider: "google", id_token }
+       5. If account not registered → POST /api/bff/customer/social-register-auth
+       6. BFF sets HttpOnly cookie; store non-sensitive name/email in localStorage
   ─────────────────────────────────────────────────────────────── */
   const handleGoogleLogin = useCallback(async () => {
     setGoogleLoading(true)
@@ -282,16 +284,16 @@ export default function CustomerLoginPage() {
       }
 
       // Step 1 — try social login
-      const loginRes = await fetch(`${API_BASE_URL}/customers/social-login`, {
+      const loginRes = await fetch("/api/bff/customer/social-login", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
+        credentials: "same-origin",
         body: JSON.stringify({ provider: "google", id_token: idToken }),
       })
       const loginData = await loginRes.json()
 
       if (loginRes.ok && loginData.success) {
         storeSession({
-          token: loginData.data?.token,
           username: loginData.data?.username,
           email: loginData.data?.email,
         })
@@ -300,10 +302,11 @@ export default function CustomerLoginPage() {
 
       // Step 2 — not registered yet → social register
       const regRes = await fetch(
-        `${API_BASE_URL}/customers/social-register-auth`,
+        "/api/bff/customer/social-register-auth",
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
+          credentials: "same-origin",
           body: JSON.stringify({
             provider: "google",
             id_token: idToken,
@@ -314,7 +317,6 @@ export default function CustomerLoginPage() {
 
       if (regRes.ok && regData.success) {
         storeSession({
-          token: regData.data?.token,
           username: regData.data?.username,
           email: regData.data?.email,
         })

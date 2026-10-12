@@ -1,7 +1,6 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { useRouter } from "next/navigation"
 import {
   Loader2,
   Sparkles,
@@ -13,8 +12,7 @@ import {
   Clock,
   CheckCircle2,
 } from "lucide-react"
-
-const API_BASE_URL = (process.env.NEXT_PUBLIC_API_URL || "").replace(/\/$/, "")
+import { customerFetch } from "@/lib/auth"
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -121,7 +119,6 @@ function levelAccent(name: string) {
 // ── Main Page ─────────────────────────────────────────────────────────────────
 
 export default function CustomerRewardPage() {
-  const router = useRouter()
   const [user, setUser] = useState<UserData | null>(null)
   const [memberLevel, setMemberLevel] = useState<MemberLevelData | null>(null)
   const [gifts, setGifts] = useState<Gift[]>([])
@@ -130,37 +127,24 @@ export default function CustomerRewardPage() {
   const [loading, setLoading] = useState(true)
   const [selectedLevel, setSelectedLevel] = useState<MemberLevelInfo | null>(null)
 
-  // Fetch user + member level
   useEffect(() => {
-    const token = localStorage.getItem("customer_token")
-    if (!token) return
-
-    const headers: Record<string, string> = {
-      Authorization: `Bearer ${token}`,
-      "Content-Type": "application/json",
-      "Accept": "application/json",
-    }
-
     const fetchData = async () => {
       try {
-        const res = await fetch(`${API_BASE_URL}/customers/me`, { headers })
-        const data = await res.json()
+        const { data } = await customerFetch("me")
         if (data.success && data.data) setUser(data.data as UserData)
       } catch (err) {
         console.error("Fetch user error:", err)
       }
 
       try {
-        const res = await fetch(`${API_BASE_URL}/customers/member-level`, { headers })
-        const data = await res.json()
+        const { data } = await customerFetch("member-level")
         if (data.success && data.data) setMemberLevel(data.data as MemberLevelData)
       } catch (err) {
         console.error("Fetch member level error:", err)
       }
 
       try {
-        const res = await fetch(`${API_BASE_URL}/customers/gifts`, { headers })
-        const data = await res.json()
+        const { data } = await customerFetch("gifts")
         if (data.success && data.data) {
           const gd = data.data as GiftsData
           setGifts(gd.gifts)

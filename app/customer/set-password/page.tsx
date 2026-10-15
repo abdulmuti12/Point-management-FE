@@ -39,11 +39,11 @@ export default function SetPasswordPage() {
     e.preventDefault()
 
     if (newPassword.length < 8) {
-      setError("Password minimal 8 karakter.")
+      setError("Password must be at least 8 characters.")
       return
     }
     if (newPassword !== confirmPassword) {
-      setError("Konfirmasi password tidak cocok.")
+      setError("Passwords do not match.")
       return
     }
 
@@ -71,10 +71,10 @@ export default function SetPasswordPage() {
         // is registered before the customer layout runs checkAuth().
         setTimeout(() => { window.location.href = "/customer" }, 1000)
       } else {
-        setError(data.message || "Gagal mengatur password. Silakan login ulang.")
+        setError(data.message || "Failed to set password. Please log in again.")
       }
     } catch {
-      setError("Terjadi kesalahan jaringan. Silakan coba lagi.")
+      setError("A network error occurred. Please try again.")
     } finally {
       setLoading(false)
     }
@@ -83,14 +83,14 @@ export default function SetPasswordPage() {
   return (
     <div className="min-h-[100dvh] bg-[#0B1120] flex items-center justify-center p-5">
       <div className="w-full max-w-[380px]">
-        <h1 className="text-xl font-bold mb-1">Atur Password Baru</h1>
+        <h1 className="text-xl font-bold mb-1">Set New Password</h1>
         <p className="text-sm text-slate-500 mb-6">
-          Akun Anda baru diaktifkan. Silakan buat password untuk melanjutkan.
+          Your account has just been activated. Please create a password to continue.
         </p>
 
         {success ? (
           <div className="p-4 rounded-xl bg-green-500/10 border border-green-500/20 text-green-400 text-sm text-center">
-            Password berhasil diatur. Mengalihkan ke dashboard…
+            Password set successfully. Redirecting to dashboard…
           </div>
         ) : (
           <form onSubmit={handleSubmit} className="space-y-5">
@@ -105,14 +105,14 @@ export default function SetPasswordPage() {
                 htmlFor="new_password"
                 className="text-[13px] font-medium text-slate-400"
               >
-                Password Baru
+                New Password
               </Label>
               <div className="relative">
                 <Key className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-500" />
                 <Input
                   id="new_password"
                   type={showPassword ? "text" : "password"}
-                  placeholder="Minimal 8 karakter"
+                  placeholder="Minimum 8 characters"
                   value={newPassword}
                   onChange={(e) => setNewPassword(e.target.value)}
                   disabled={loading}
@@ -138,14 +138,14 @@ export default function SetPasswordPage() {
                 htmlFor="confirm_password"
                 className="text-[13px] font-medium text-slate-400"
               >
-                Konfirmasi Password
+                Confirm Password
               </Label>
               <div className="relative">
                 <Key className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-500" />
                 <Input
                   id="confirm_password"
                   type={showPassword ? "text" : "password"}
-                  placeholder="Ulangi password"
+                  placeholder="Repeat password"
                   value={confirmPassword}
                   onChange={(e) => setConfirmPassword(e.target.value)}
                   disabled={loading}
@@ -166,10 +166,10 @@ export default function SetPasswordPage() {
               {loading ? (
                 <span className="flex items-center justify-center gap-2">
                   <Loader2 className="h-4 w-4 animate-spin" />
-                  Memproses…
+                  Processing…
                 </span>
               ) : (
-                "Simpan Password"
+                "Save Password"
               )}
             </Button>
           </form>

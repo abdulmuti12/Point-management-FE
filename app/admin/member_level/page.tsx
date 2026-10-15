@@ -251,7 +251,7 @@ export default function MemberLevelPage() {
     setEditDescription(level.description || "")
     setEditStatus(level.status)
     setEditFile(null)
-    setEditImagePreview(level.file ? `${process.env.NEXT_PUBLIC_API_URL?.replace("/api", "")}/storage/${level.file}` : null)
+    setEditImagePreview(level.file ? getImageUrl(level.file) : null)
     setExistingFilePath(level.file)
     setIsEditOpen(true)
   }
@@ -371,7 +371,11 @@ export default function MemberLevelPage() {
 
   const getImageUrl = (filePath: string | null) => {
     if (!filePath) return null
-    return `${process.env.NEXT_PUBLIC_API_URL?.replace("/api", "")}/storage/${filePath}`
+    // The API host (`php artisan serve`) does not serve the /storage docroot,
+    // so relative paths 404. Route through the BFF storage proxy instead.
+    if (filePath.startsWith("http")) return filePath
+    const clean = filePath.replace(/^\/storage\//, "").replace(/^\//, "")
+    return `/api/bff/storage/${clean}`
   }
 
   return (

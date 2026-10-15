@@ -2,10 +2,11 @@
 
 import type React from "react"
 import { useEffect, useState } from "react"
-import { useRouter } from "next/navigation"
+import { useRouter, usePathname } from "next/navigation"
 import { SidebarProvider } from "@/components/ui/sidebar"
 import { AppSidebar } from "@/components/app-sidebar"
 import { DashboardHeader } from "@/components/dashboard-header"
+import { RequireAdminMenu } from "@/components/require-admin-menu"
 
 export default function DashboardLayout({
   children,
@@ -15,6 +16,7 @@ export default function DashboardLayout({
   const [isAuthenticated, setIsAuthenticated] = useState(false)
   const [isLoading, setIsLoading] = useState(true)
   const router = useRouter()
+  const pathname = usePathname()
 
   useEffect(() => {
     const checkAuth = async () => {
@@ -60,7 +62,9 @@ export default function DashboardLayout({
         <AppSidebar />
         <div className="flex-1 flex flex-col">
           <DashboardHeader />
-          <main className="flex-1">{children}</main>
+          <main className="flex-1">
+            <RequireAdminMenu path={pathname}>{children}</RequireAdminMenu>
+          </main>
         </div>
       </div>
     </SidebarProvider>

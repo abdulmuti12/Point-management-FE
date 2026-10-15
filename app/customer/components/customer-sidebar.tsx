@@ -98,7 +98,7 @@ export function CustomerSidebar({
                      hover:text-red-600 hover:bg-red-500/[0.06] transition-colors"
         >
           <LogOut className="w-4.5 h-4.5" />
-          Keluar
+          Log Out
         </button>
       </div>
     </div>
@@ -107,7 +107,7 @@ export function CustomerSidebar({
   return (
     <>
       {/* Desktop sidebar */}
-      <aside className="hidden lg:flex flex-col w-[240px] shrink-0
+      <aside className="hidden lg:flex flex-col w-[240px] shrink-0 h-full sticky top-0
                         border-r border-black/[0.08] bg-white/40 backdrop-blur">
         {sidebarContent}
       </aside>

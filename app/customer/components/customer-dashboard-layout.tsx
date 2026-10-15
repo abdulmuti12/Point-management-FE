@@ -13,6 +13,7 @@ export function CustomerDashboardLayout({
 }) {
   const router = useRouter()
   const pathname = usePathname()
+  const [authChecked, setAuthChecked] = useState(false)
   const [isAuth, setIsAuth] = useState(false)
   const [customerName, setCustomerName] = useState("")
   const [mobileOpen, setMobileOpen] = useState(false)
@@ -27,8 +28,9 @@ export function CustomerDashboardLayout({
         try {
           const result = await checkAuth()
           if (result.authenticated && result.role === "customer") {
-            setCustomerName(localStorage.getItem("customer_name") || "Pelanggan")
+            setCustomerName(localStorage.getItem("customer_name") || "Customer")
             setIsAuth(true)
+            setAuthChecked(true)
             return
           }
         } catch {}
@@ -44,16 +46,30 @@ export function CustomerDashboardLayout({
       }
 
       router.push("/customer/login")
+      setAuthChecked(true)
     }
+
     verify()
   }, [router])
 
+  if (!authChecked) {
+    return (
+      <div className="min-h-[100dvh] bg-white/95">
+        <div className="min-h-[100dvh] flex items-center justify-center">
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500 mx-auto" />
+            <p className="mt-4 text-slate-400 text-sm">Loading…</p>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
   if (!isAuth) {
     return (
-      <div className="min-h-[100dvh] flex items-center justify-center bg-[#0B1120]">
+      <div className="min-h-[100dvh] flex items-center justify-center bg-white/95">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-400 mx-auto" />
-          <p className="mt-4 text-slate-500 text-sm">Memuat…</p>
+          <p className="text-slate-500 text-sm">Redirecting to login…</p>
         </div>
       </div>
     )
@@ -73,13 +89,7 @@ export function CustomerDashboardLayout({
 
   return (
     <div
-      className="min-h-[100dvh] flex"
-      style={{
-        backgroundColor: "#0B1120",
-        backgroundImage: "url(/images/login-bg-right.png)",
-        backgroundSize: "cover",
-        backgroundPosition: "center",
-      }}
+      className="h-[100dvh] flex bg-slate-50 overflow-hidden"
     >
       <CustomerSidebar
         customerName={customerName}
@@ -87,7 +97,7 @@ export function CustomerDashboardLayout({
         onMobileClose={() => setMobileOpen(false)}
       />
 
-      <div className="flex-1 flex flex-col min-w-0">
+      <div className="flex-1 flex flex-col min-w-0 min-h-0">
         {/* Mobile top bar */}
         <div className="lg:hidden flex items-center justify-between p-4 border-b border-black/[0.08] bg-white/40 backdrop-blur">
           <button

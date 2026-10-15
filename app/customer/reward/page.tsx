@@ -86,6 +86,68 @@ interface GiftClaim {
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
+const CLAIM_FILTER_LABELS: Record<ClaimStatus, string> = {
+  waiting: "Waiting",
+  approved: "Approved",
+  completed: "Completed",
+  rejected: "Rejected",
+}
+
+const CLAIM_STATUS_META: Record<ClaimStatus, { label: string; badge: string; icon: typeof Clock }> = {
+  waiting: {
+    label: "Waiting",
+    badge: "bg-blue-100 border-blue-300 text-blue-700",
+    icon: Clock,
+  },
+  approved: {
+    label: "Approved",
+    badge: "bg-emerald-100 border-emerald-300 text-emerald-700",
+    icon: CheckCircle2,
+  },
+  completed: {
+    label: "Completed",
+    badge: "bg-slate-100 border-slate-300 text-slate-600",
+    icon: CheckCircle2,
+  },
+  rejected: {
+    label: "Rejected",
+    badge: "bg-red-100 border-red-300 text-red-700",
+    icon: X,
+  },
+}
+
+// The API host (Go API at :8001) is 404-ing its own /storage/... files, so the
+// absolute URLs it returns (http://localhost:8001/storage/...) don't render.
+// Re-route any /storage/... reference (absolute or relative) through the BFF
+// storage proxy, which streams the file from the API's storage disk.
+function storageProxyUrl(url: string | null | undefined): string | null {
+  if (!url) return null
+  if (url.startsWith("http")) {
+    try {
+      const u = new URL(url)
+      // Only rewrite /storage/ URLs; leave other origins alone.
+      if (u.pathname.includes("/storage/")) {
+        const rel = u.pathname.replace(/^\/storage\//, "")
+        return `/api/bff/storage/${rel}`
+      }
+    } catch {
+      /* fall through */
+    }
+    return url
+  }
+  // Relative or already-a-storage path
+  return `/api/bff/storage/${url.replace(/^\/storage\//, "").replace(/^\//, "")}`
+}
+
+function formatDate(iso: string | null | undefined) {
+  if (!iso) return ""
+  return new Intl.DateTimeFormat("id-ID", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+  }).format(new Date(iso))
+}
+
 function formatPhone(phone: string | null | undefined) {
   if (!phone) return "—"
   const cleaned = phone.replace(/\D/g, "")
@@ -127,6 +189,24 @@ export default function CustomerRewardPage() {
   const [loading, setLoading] = useState(true)
   const [selectedLevel, setSelectedLevel] = useState<MemberLevelInfo | null>(null)
 
+  const [claims, setClaims] = useState<GiftClaim[]>([])
+  const [claimsLoading, setClaimsLoading] = useState(true)
+  const [claimFilter, setClaimFilter] = useState<ClaimStatus | "all">("all")
+  const [claimingGiftId, setClaimingGiftId] = useState<string | null>(null)
+
+  const fetchClaims = async (filter: ClaimStatus | "all" = "all") => {
+    setClaimsLoading(true)
+    try {
+      const endpoint = filter === "all" ? "gifts/claims" : `gifts/claims?status=${filter}`
+      const { data } = await customerFetch(endpoint)
+      if (data.success && data.data) setClaims(data.data.claims || [])
+    } catch (err) {
+      console.error("Fetch claims error:", err)
+    } finally {
+      setClaimsLoading(false)
+    }
+  }
+
   useEffect(() => {
     const fetchData = async () => {
       try {
@@ -156,10 +236,40 @@ export default function CustomerRewardPage() {
         setGiftsLoading(false)
         setLoading(false)
       }
+
+      fetchClaims()
     }
 
     fetchData()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
+
+  useEffect(() => {
+    if (claimFilter !== "all") fetchClaims(claimFilter)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [claimFilter])
+
+  async function handleClaimGift(gift: Gift) {
+    setClaimingGiftId(gift.id)
+    try {
+      const { ok, data } = await customerFetch("gifts/claim", {
+        method: "POST",
+        body: JSON.stringify({ gift_id: gift.id, notes: "" }),
+      })
+      if (ok) {
+        const { data: giftsData } = await customerFetch("gifts")
+        if (giftsData.success && giftsData.data) {
+          setGifts(giftsData.data.gifts)
+          setActivePoints(giftsData.data.total_points)
+        }
+        fetchClaims()
+      }
+    } catch (err) {
+      console.error("Claim gift error:", err)
+    } finally {
+      setClaimingGiftId(null)
+    }
+  }
 
   // Close modal on Escape
   useEffect(() => {
@@ -181,7 +291,7 @@ export default function CustomerRewardPage() {
       {/* Page Header */}
       <div>
         <h1 className="text-xl font-bold text-slate-900 mb-1">Reward</h1>
-        <p className="text-slate-500 text-sm">Points dari setiap transaksi Anda.</p>
+        <p className="text-slate-500 text-sm">Points earned from each of your transactions.</p>
       </div>
 
       {/* Member Level Section */}
@@ -193,15 +303,15 @@ export default function CustomerRewardPage() {
               Member Level
             </h2>
             <p className="text-xs text-slate-500 mt-1">
-              Kartu membership dan tier reward Anda.
+              Your membership card and reward tier.
             </p>
           </div>
           {memberLevel && (
             <div className="text-right">
-              <p className="text-xs text-slate-500">Poin Terkumpul</p>
+              <p className="text-xs text-slate-500">Total Points</p>
               <p className="text-2xl font-light text-amber-600">
                 {memberLevel.total_points.toLocaleString("id-ID")}
-                <span className="text-xs text-slate-500 ml-1">poin</span>
+                <span className="text-xs text-slate-500 ml-1">pts</span>
               </p>
             </div>
           )}
@@ -229,7 +339,7 @@ export default function CustomerRewardPage() {
           </div>
         ) : (
           <div className="bg-slate-50 border border-slate-200 rounded-xl p-6 text-center text-slate-500 text-sm">
-            Data member level belum tersedia.
+            Member level data is not yet available.
           </div>
         )}
 
@@ -238,7 +348,7 @@ export default function CustomerRewardPage() {
           <div className="mt-5 bg-slate-50 border border-slate-200 rounded-xl p-4">
             <div className="flex items-center justify-between mb-2">
               <span className="text-xs text-slate-600">
-                Progress menuju{" "}
+                Progress to{" "}
                 <span className="font-medium text-amber-600">
                   {memberLevel.next_level.name}
                 </span>
@@ -255,7 +365,7 @@ export default function CustomerRewardPage() {
             </div>
             <p className="text-[11px] text-slate-500 mt-2">
               {memberLevel.progress.current.toLocaleString("id-ID")} /{" "}
-              {memberLevel.progress.target.toLocaleString("id-ID")} poin
+              {memberLevel.progress.target.toLocaleString("id-ID")} pts
             </p>
           </div>
         )}
@@ -270,7 +380,7 @@ export default function CustomerRewardPage() {
           <p className="text-lg font-semibold text-amber-600">
             {giftsLoading ? "…" : activePoints.toLocaleString("id-ID")}
           </p>
-          <p className="text-[10px] text-slate-500 mt-0.5">Poin Aktif</p>
+          <p className="text-[10px] text-slate-500 mt-0.5">Active Points</p>
         </div>
         <div className="bg-slate-50 border border-slate-200 rounded-xl p-4 text-center">
           <div className="inline-flex items-center justify-center w-8 h-8 rounded-full bg-emerald-500/15 mb-2">
@@ -288,7 +398,7 @@ export default function CustomerRewardPage() {
           <p className="text-lg font-semibold text-slate-600">
             {giftsLoading ? "…" : gifts.filter((g) => g.pending_claim).length}
           </p>
-          <p className="text-[10px] text-slate-500 mt-0.5">Klaim Menunggu</p>
+          <p className="text-[10px] text-slate-500 mt-0.5">Pending Claims</p>
         </div>
       </div>
 
@@ -300,10 +410,10 @@ export default function CustomerRewardPage() {
               <Gift className="w-4 h-4 text-amber-500" />
               Gift Catalog
             </h2>
-            <p className="text-xs text-slate-500 mt-1">Tukar poin Anda dengan hadiah menarik.</p>
+            <p className="text-xs text-slate-500 mt-1">Redeem your points for exciting rewards.</p>
           </div>
           <div className="text-right">
-            <p className="text-xs text-slate-500">Poin Aktif</p>
+            <p className="text-xs text-slate-500">Active Points</p>
             <p className="text-2xl font-light text-amber-600">
               {giftsLoading ? "…" : activePoints.toLocaleString("id-ID")}
               <span className="text-xs text-slate-500 ml-1">poin</span>
@@ -318,7 +428,7 @@ export default function CustomerRewardPage() {
         ) : gifts.length === 0 ? (
           <div className="bg-slate-50 border border-slate-200 rounded-xl p-8 text-center">
             <Gift className="w-10 h-10 text-slate-400 mx-auto mb-3" />
-            <p className="text-sm text-slate-500">Belum ada hadiah yang tersedia.</p>
+            <p className="text-sm text-slate-500">No rewards are available yet.</p>
           </div>
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -334,6 +444,8 @@ export default function CustomerRewardPage() {
                   remaining={remaining}
                   pendingStatus={pendingStatus}
                   isLockedByPending={isLockedByPending}
+                  isClaiming={claimingGiftId === gift.id}
+                  onClaim={() => handleClaimGift(gift)}
                 />
               )
             })}
@@ -341,9 +453,55 @@ export default function CustomerRewardPage() {
         )}
       </div>
 
-      {/* My Claims — placeholder, akan diimplementasi selanjutnya */}
-      <div className="rounded-xl bg-slate-50 border border-slate-200 p-6 text-center">
-        <p className="text-sm text-slate-500">My Claims — segera hadir</p>
+      {/* My Claims */}
+      <div>
+        <div className="flex items-center justify-between mb-4">
+          <div>
+            <h2 className="text-lg font-semibold text-slate-900 flex items-center gap-2">
+              <Award className="w-4 h-4 text-amber-500" />
+              My Claims
+            </h2>
+            <p className="text-xs text-slate-500 mt-1">History of your reward claims.</p>
+          </div>
+        </div>
+
+        {/* Filter tabs */}
+        <div className="flex flex-wrap gap-1.5 mb-4">
+          {(["all", "waiting", "approved", "completed", "rejected"] as const).map((f) => (
+            <button
+              key={f}
+              type="button"
+              onClick={() => setClaimFilter(f)}
+              className={[
+                "px-3 py-1.5 rounded-full text-xs font-medium transition-colors",
+                claimFilter === f
+                  ? "bg-slate-900 text-white"
+                  : "bg-slate-100 text-slate-500 hover:bg-slate-200",
+              ].join(" ")}
+            >
+              {f === "all" ? "All" : CLAIM_FILTER_LABELS[f]}
+            </button>
+          ))}
+        </div>
+
+        {claimsLoading ? (
+          <div className="flex items-center justify-center py-12">
+            <Loader2 className="w-6 h-6 animate-spin text-amber-500" />
+          </div>
+        ) : claims.length === 0 ? (
+          <div className="rounded-xl bg-slate-50 border border-slate-200 p-8 text-center">
+            <Gift className="w-10 h-10 text-slate-400 mx-auto mb-3" />
+            <p className="text-sm text-slate-500">
+              {claimFilter === "all" ? "No reward claims yet." : "No claims with this status yet."}
+            </p>
+          </div>
+        ) : (
+          <div className="space-y-3">
+            {claims.map((claim) => (
+              <MyClaimCard key={claim.id} claim={claim} />
+            ))}
+          </div>
+        )}
       </div>
 
       {/* Member Level Modal */}
@@ -416,10 +574,11 @@ function MemberLevelCard({
           <div className="w-full aspect-[16/9] flex items-center justify-center">
             {level.image_url ? (
               <img
-                src={level.image_url}
+                src={storageProxyUrl(level.image_url) || level.image_url}
                 alt={level.name}
                 className="w-full h-full object-contain"
                 loading="lazy"
+                onError={(e) => { (e.target as HTMLImageElement).style.display = "none" }}
               />
             ) : (
               <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-slate-100 to-slate-200">
@@ -452,8 +611,8 @@ function MemberLevelCard({
           <p className="text-[11px] text-slate-600">
             {level.min_point.toLocaleString("id-ID")}
             {level.max_point > 0
-              ? ` – ${level.max_point.toLocaleString("id-ID")} poin`
-              : "+ poin"}
+              ? ` – ${level.max_point.toLocaleString("id-ID")} pts`
+              : "+ pts"}
           </p>
           {level.description && (
             <p className="text-[10px] text-slate-500 mt-2 line-clamp-2">
@@ -476,12 +635,16 @@ function GiftCard({
   remaining,
   pendingStatus,
   isLockedByPending,
+  isClaiming,
+  onClaim,
 }: {
   gift: Gift
   activePoints: number
   remaining: number
   pendingStatus: ClaimStatus | null
   isLockedByPending: boolean
+  isClaiming: boolean
+  onClaim: () => void
 }) {
   return (
     <div
@@ -499,22 +662,22 @@ function GiftCard({
         {pendingStatus === "waiting" ? (
           <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] uppercase tracking-wider bg-blue-100 border border-blue-300 text-blue-700">
             <Clock className="w-3 h-3" />
-            Menunggu
+            Waiting
           </span>
         ) : pendingStatus === "approved" ? (
           <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] uppercase tracking-wider bg-emerald-100 border border-emerald-300 text-emerald-700">
             <CheckCircle2 className="w-3 h-3" />
-            Disetujui
+            Approved
           </span>
         ) : gift.claimable ? (
           <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] uppercase tracking-wider bg-amber-100 border border-amber-300 text-amber-700">
             <Sparkles className="w-3 h-3" />
-            Bisa Klaim
+            Claimable
           </span>
         ) : (
           <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] uppercase tracking-wider bg-slate-100 border border-slate-300 text-slate-500">
             <Coins className="w-3 h-3" />
-            Terkunci
+            Locked
           </span>
         )}
       </div>
@@ -523,10 +686,11 @@ function GiftCard({
       <div className="aspect-[4/3] bg-slate-100 overflow-hidden">
         {gift.image ? (
           <img
-            src={gift.image}
+            src={storageProxyUrl(gift.image) || gift.image}
             alt={gift.name}
             className={`w-full h-full object-cover ${gift.claimable || isLockedByPending ? "" : "grayscale"}`}
             loading="lazy"
+            onError={(e) => { (e.target as HTMLImageElement).style.display = "none" }}
           />
         ) : (
           <div className="w-full h-full flex items-center justify-center text-slate-300">
@@ -544,7 +708,7 @@ function GiftCard({
 
         <div className="mt-3 pt-3 border-t border-slate-100">
           <div className="flex items-center justify-between mb-3">
-            <span className="text-xs text-slate-500">Poin Dibutuhkan</span>
+            <span className="text-xs text-slate-500">Points Required</span>
             <span className="text-sm font-semibold text-amber-600">
               {gift.total_point.toLocaleString("id-ID")}
             </span>
@@ -553,9 +717,18 @@ function GiftCard({
           {gift.claimable ? (
             <button
               type="button"
-              className="w-full py-2 rounded-xl text-xs uppercase tracking-wider font-semibold bg-amber-500 hover:bg-amber-400 text-white transition-colors shadow-sm shadow-amber-500/20"
+              disabled={isClaiming}
+              onClick={onClaim}
+              className="w-full py-2 rounded-xl text-xs uppercase tracking-wider font-semibold bg-amber-500 hover:bg-amber-400 disabled:opacity-60 text-white transition-colors shadow-sm shadow-amber-500/20"
             >
-              Klaim Sekarang
+              {isClaiming ? (
+                <span className="inline-flex items-center justify-center gap-1.5">
+                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                  Claiming…
+                </span>
+              ) : (
+                "Claim Now"
+              )}
             </button>
           ) : isLockedByPending ? (
             <button
@@ -563,7 +736,7 @@ function GiftCard({
               disabled
               className="w-full py-2 rounded-xl text-xs uppercase tracking-wider font-medium cursor-not-allowed bg-blue-50 border border-blue-200 text-blue-500"
             >
-              {pendingStatus === "waiting" ? "Menunggu Approval" : "Disetujui"}
+              {pendingStatus === "waiting" ? "Awaiting Approval" : "Approved"}
             </button>
           ) : (
             <button
@@ -571,10 +744,59 @@ function GiftCard({
               disabled
               className="w-full py-2 rounded-xl text-xs uppercase tracking-wider font-medium cursor-not-allowed bg-slate-100 border border-slate-200 text-slate-400"
             >
-              Butuh {remaining.toLocaleString("id-ID")} poin lagi
+              Need {remaining.toLocaleString("id-ID")} more pts
             </button>
           )}
         </div>
+      </div>
+    </div>
+  )
+}
+
+// ── MyClaimCard ───────────────────────────────────────────────────────────────
+
+function MyClaimCard({ claim }: { claim: GiftClaim }) {
+  const meta = CLAIM_STATUS_META[claim.status] ?? CLAIM_STATUS_META.waiting
+  const StatusIcon = meta.icon
+
+  return (
+    <div className="rounded-xl bg-white border border-slate-200 p-4 flex items-start gap-3">
+      {/* Image */}
+      <div className="w-14 h-14 rounded-lg bg-slate-100 flex items-center justify-center overflow-hidden shrink-0">
+        {claim.gift_image ? (
+          <img
+            src={storageProxyUrl(claim.gift_image) || claim.gift_image}
+            alt={claim.gift_name || ""}
+            className="w-full h-full object-cover"
+            loading="lazy"
+            onError={(e) => { (e.target as HTMLImageElement).style.display = "none" }}
+          />
+        ) : (
+          <Gift className="w-6 h-6 text-slate-300" />
+        )}
+      </div>
+
+      {/* Body */}
+      <div className="flex-1 min-w-0">
+        <div className="flex items-center gap-2 flex-wrap mb-1">
+          <p className="text-sm font-semibold text-slate-900 truncate">{claim.gift_name || "Reward"}</p>
+          <span
+            className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] uppercase tracking-wider border ${meta.badge}`}
+          >
+            <StatusIcon className="w-3 h-3" />
+            {meta.label}
+          </span>
+        </div>
+        <p className="text-xs text-slate-500">
+          {claim.required_point.toLocaleString("id-ID")} pts · {formatDate(claim.created_at)}
+        </p>
+        {claim.notes && <p className="text-[11px] text-slate-500 mt-1 italic">Note: {claim.notes}</p>}
+        {claim.status === "rejected" && claim.admin_note && (
+          <p className="text-[11px] text-red-600 mt-1">Reason: {claim.admin_note}</p>
+        )}
+        {claim.status === "completed" && claim.completed_at && (
+          <p className="text-[11px] text-slate-500 mt-1">Completed: {formatDate(claim.completed_at)}</p>
+        )}
       </div>
     </div>
   )
@@ -625,9 +847,10 @@ function MemberLevelModal({
             <div className="w-full max-h-[70vh] flex items-center justify-center">
               {level.image_url ? (
                 <img
-                  src={level.image_url}
+                  src={storageProxyUrl(level.image_url) || level.image_url}
                   alt={level.name}
                   className="w-full max-h-[70vh] object-contain"
+                  onError={(e) => { (e.target as HTMLImageElement).style.display = "none" }}
                 />
               ) : (
                 <div className="w-full h-64 flex items-center justify-center bg-gradient-to-br from-slate-100 to-slate-200">
@@ -667,8 +890,8 @@ function MemberLevelModal({
             <p className="text-sm text-slate-700">
               {level.min_point.toLocaleString("id-ID")}
               {level.max_point > 0
-                ? ` – ${level.max_point.toLocaleString("id-ID")} poin`
-                : "+ poin"}
+                ? ` – ${level.max_point.toLocaleString("id-ID")} pts`
+                : "+ pts"}
             </p>
             {level.description && (
               <p className="text-sm text-slate-600 mt-3">{level.description}</p>

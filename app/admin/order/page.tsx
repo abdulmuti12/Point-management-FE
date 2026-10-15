@@ -410,14 +410,14 @@ export default function OrderPage() {
         const list: CustomerOption[] = data.data?.data || []
         setCustomers(list)
         if (list.length === 0) {
-          setOrderFormError("Belum ada customer aktif. Tambahkan customer terlebih dahulu.")
+          setOrderFormError("No active customers yet. Please add a customer first.")
         }
       } else {
-        setOrderFormError(data.message || "Gagal memuat daftar customer.")
+        setOrderFormError(data.message || "Failed to load customer list.")
       }
     } catch (error) {
       console.error("Fetch customers error:", error)
-      setOrderFormError("Network error saat memuat daftar customer.")
+      setOrderFormError("Network error while loading customer list.")
     } finally {
       setIsLoadingCustomers(false)
     }
@@ -441,7 +441,7 @@ export default function OrderPage() {
   const handleAddCustomer = async () => {
     setNewCustomerError("")
     if (!newCustomerForm.name.trim() || !newCustomerForm.full_name.trim() || !newCustomerForm.email.trim() || !newCustomerForm.phone_number.trim()) {
-      setNewCustomerError("Nama, nama lengkap, email, dan nomor telepon wajib diisi.")
+      setNewCustomerError("Name, full name, email, and phone number are required.")
       return
     }
     try {
@@ -452,7 +452,7 @@ export default function OrderPage() {
       })
       if (ok && data.success) {
         const created = data.data?.customer
-        addToast("success", "Customer ditambahkan", `Akun untuk ${created?.full_name} berhasil dibuat.`)
+        addToast("success", "Customer added", `Account for ${created?.full_name} created successfully.`)
         await fetchCustomers()
         if (created?.id) {
           setManualOrderForm((prev) => ({
@@ -465,16 +465,16 @@ export default function OrderPage() {
         resetNewCustomerForm()
         setIsAddCustomerDialogOpen(false)
       } else {
-        const errorMsg = data?.error || data?.message || "Gagal menambahkan customer."
+        const errorMsg = data?.error || data?.message || "Failed to add customer."
         setNewCustomerError(errorMsg)
         if (status === 409 || status === 422) {
-          addToast("error", "Gagal membuat customer", errorMsg)
+          addToast("error", "Failed to create customer", errorMsg)
         }
       }
     } catch (err) {
       console.error("Add customer error:", err)
-      setNewCustomerError("Network error saat menambahkan customer.")
-      addToast("error", "Network error", "Network error saat menambahkan customer.")
+      setNewCustomerError("Network error while adding customer.")
+      addToast("error", "Network error", "Network error while adding customer.")
     } finally {
       setIsAddingCustomer(false)
     }
@@ -560,29 +560,29 @@ export default function OrderPage() {
     setOrderFormError("")
 
     if (!manualOrderForm.customer_id) {
-      setOrderFormError("Customer wajib dipilih.")
+      setOrderFormError("Customer must be selected.")
       return
     }
 
     // Validate items
     if (manualOrderItems.length === 0) {
-      setOrderFormError("Setidaknya satu item harus ditambahkan ke transaksi.")
+      setOrderFormError("At least one item must be added to the transaction.")
       return
     }
 
     for (const item of manualOrderItems) {
       if (!item.name.trim()) {
-        setOrderFormError("Nama item tidak boleh kosong.")
+        setOrderFormError("Item name cannot be empty.")
         return
       }
       const qty = parseInt(item.quantity, 10)
       if (!item.quantity || isNaN(qty) || qty <= 0) {
-        setOrderFormError(`Quantity item "${item.name}" harus angka > 0.`)
+        setOrderFormError(`Quantity of item "${item.name}" must be a number > 0.`)
         return
       }
       const price = Number(item.price)
       if (isNaN(price) || price <= 0) {
-        setOrderFormError(`Harga item "${item.name}" harus angka > 0.`)
+        setOrderFormError(`Price of item "${item.name}" must be a number > 0.`)
         return
       }
     }
@@ -620,8 +620,8 @@ export default function OrderPage() {
       if (ok && data.success) {
         addToast(
           "success",
-          "Transaksi Berhasil",
-          `Order ${data.data?.order_number || ""} berhasil ditambahkan`,
+          "Transaction Successful",
+          `Order ${data.data?.order_number || ""} added successfully`,
         )
         setIsManualOrderOpen(false)
         fetchOrders(currentPage, searchValue)
@@ -639,9 +639,9 @@ export default function OrderPage() {
         const message =
           typeof data.message === "string"
             ? data.message
-            : Object.values(data.message || {}).flat().join(", ") || "Gagal menyimpan transaksi."
+            : Object.values(data.message || {}).flat().join(", ") || "Failed to save transaction."
         setOrderFormError(message)
-        addToast("error", "Gagal", message)
+        addToast("error", "Failed", message)
       }
     } catch (error) {
       console.error("Submit manual order error:", error)
@@ -818,7 +818,7 @@ export default function OrderPage() {
           className="bg-slate-900 hover:bg-slate-800 text-white"
         >
           <Plus className="w-4 h-4 mr-2" />
-          Input Transaksi Manual
+          Input Manual Transaction
         </Button>
       </div>
 
@@ -1322,20 +1322,20 @@ export default function OrderPage() {
                   {selectedOrderDetail.status === "cancelled" ? (
                     <div className="p-4 border border-red-200 bg-red-50 rounded-lg">
                       <p className="text-sm text-red-700">
-                        Order dibatalkan — tidak ada point yang dikreditkan.
+                        Order cancelled — no points were credited.
                       </p>
                     </div>
                   ) : (selectedOrderDetail.status === "delivered" || selectedOrderDetail.status === "success") ? (
                     <div className="p-4 border border-amber-200 bg-amber-50 rounded-lg space-y-3">
                       <div className="grid grid-cols-2 gap-3">
                         <div>
-                          <p className="text-xs text-amber-700 mb-1">Point dari order ini</p>
+                          <p className="text-xs text-amber-700 mb-1">Points from this order</p>
                           <p className="text-xl font-bold text-amber-900">
                             +{((selectedOrderDetail.order_points_delta ?? 0)).toLocaleString()} pts
                           </p>
                         </div>
                         <div>
-                          <p className="text-xs text-amber-700 mb-1">Total point customer</p>
+                          <p className="text-xs text-amber-700 mb-1">Customer total points</p>
                           <p className="text-xl font-bold text-amber-900">
                             {(selectedOrderDetail.customer_points ?? 0).toLocaleString()} pts
                           </p>

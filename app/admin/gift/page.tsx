@@ -288,7 +288,11 @@ export default function GiftPage() {
   const getGiftImage = (imagePath: string | null) => {
     if (!imagePath) return "/placeholder.svg?height=40&width=40"
     if (imagePath.startsWith("http")) return imagePath
-    return `${process.env.NEXT_PUBLIC_API_URL?.replace("/api", "")}/storage/${imagePath}`
+    // Admin API returns a raw relative storage path (e.g. "gifts/xxx.png").
+    // Route through the BFF storage proxy, which streams the file from the API's
+    // storage disk — `php artisan serve` does not expose the /storage docroot.
+    const clean = imagePath.replace(/^\/storage\//, "").replace(/^\//, "")
+    return `/api/bff/storage/${clean}`
   }
 
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {

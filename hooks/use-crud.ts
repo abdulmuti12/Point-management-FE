@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useCallback } from "react"
-import { useSWR } from "swr"
+import useSWR from "swr"
 import type { PaginatedResponse, PaginationMeta } from "@/lib/types"
 
 export interface UseCrudOptions<T> {

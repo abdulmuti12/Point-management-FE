@@ -44,18 +44,31 @@ async function proxyRequest(
   const url = new URL(req.url);
   const targetUrl = `${API_BASE_URL}/customers/${endpoint}${url.search}`;
 
-  let body: string | undefined;
+  const requestContentType = req.headers.get("content-type") || "";
+  const isMultipart = requestContentType.includes("multipart/form-data");
+
+  const forwardHeaders: Record<string, string> = {
+    Authorization: `Bearer ${jwtToken}`,
+  };
+
+  let body: ArrayBuffer | string | undefined;
   if (method !== "GET" && method !== "DELETE") {
-    body = await req.text();
+    if (isMultipart) {
+      // Multipart bodies contain binary parts; must forward raw bytes so the
+      // client-supplied boundary survives the hop. req.arrayBuffer() is
+      // available on NextRequest and safe to pass to fetch on Node.
+      forwardHeaders["Content-Type"] = requestContentType;
+      body = await req.arrayBuffer();
+    } else {
+      body = await req.text();
+      forwardHeaders["Content-Type"] = "application/json";
+    }
   }
 
   try {
     const res = await fetch(targetUrl, {
       method,
-      headers: {
-        Authorization: `Bearer ${jwtToken}`,
-        "Content-Type": "application/json",
-      },
+      headers: forwardHeaders,
       body,
       cache: "no-store",
       redirect: "follow",

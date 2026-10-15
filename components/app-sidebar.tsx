@@ -58,7 +58,7 @@ const defaultMenuItems = [
   { id: 12, title: "Logo", url: "/admin/logo", icon: Palette },
   { id: 13, title: "Point Customer", url: "/admin/point-customer", icon: Award },
   { id: 14, title: "Gift", url: "/admin/gift", icon: Package },
-  { id: 15, title: "Approval Klaim", url: "/admin/approval", icon: CheckCircle2 },
+  { id: 15, title: "Claim Approval", url: "/admin/approval", icon: CheckCircle2 },
   { id: 16, title: "Member Level", url: "/admin/member_level", icon: Award },
 ]
 

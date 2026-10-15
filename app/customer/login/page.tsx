@@ -122,7 +122,7 @@ function GoogleButton({
         </svg>
       )}
       <span className="text-[14px] font-medium text-[#1a1a1a]">
-        {loading ? "Menghubungkan ke Google…" : "Masuk dengan Google"}
+        {loading ? "Connecting to Google…" : "Log in with Google"}
       </span>
     </button>
   )
@@ -141,7 +141,7 @@ function loadGoogleIdClient(): Promise<void> {
     script.async = true
     script.defer = true
     script.onload = () => resolve()
-    script.onerror = () => reject(new Error("Gagal memuat Google SDK"))
+    script.onerror = () => reject(new Error("Failed to load Google SDK"))
     document.head.appendChild(script)
   })
 }
@@ -234,9 +234,9 @@ export default function CustomerLoginPage() {
         return
       }
 
-      setError(data.message || "Email atau password salah. Silakan periksa kembali.")
+      setError(data.message || "Invalid email or password. Please check and try again.")
     } catch {
-      setError("Terjadi kesalahan jaringan. Hubungi tim dukungan bila masalah berlanjut.")
+      setError("A network error occurred. Please contact support if the issue persists.")
     } finally {
       setManualLoading(false)
     }
@@ -259,7 +259,7 @@ export default function CustomerLoginPage() {
 
     if (!clientId) {
       setError(
-        "Login Google belum dikonfigurasi. Silakan hubungi admin untuk mengatur Google OAuth."
+        "Google login is not configured. Please contact the admin to set up Google OAuth."
       )
       setGoogleLoading(false)
       return
@@ -323,9 +323,9 @@ export default function CustomerLoginPage() {
         return
       }
 
-      setError(regData.message || "Login Google gagal. Silakan coba lagi.")
+      setError(regData.message || "Google login failed. Please try again.")
     } catch {
-      setError("Gagal memproses login Google. Silakan coba lagi.")
+      setError("Failed to process Google login. Please try again.")
     } finally {
       setGoogleLoading(false)
     }
@@ -375,7 +375,7 @@ export default function CustomerLoginPage() {
             <span className="text-blue-600"> Management</span>
           </h1>
           <p className="text-sm leading-relaxed text-[#6b6b6b]">
-            Portal pelanggan untuk memantau poin, aktivitas, dan reward Anda
+            Customer portal to track your points, activity, and rewards
           </p>
 
           <p className="mt-14 text-xs text-[#a0a0a0]">
@@ -406,16 +406,16 @@ export default function CustomerLoginPage() {
             ) : (
               <LogoFallback size="sm" />
             )}
-            <h1 className="text-xl font-bold tracking-tight text-[#1a1a1a]">Selamat Datang</h1>
+            <h1 className="text-xl font-bold tracking-tight text-[#1a1a1a]">Welcome</h1>
             <p className="text-[13px] text-[#6b6b6b] mt-1">
-              Masuk ke akun pelanggan Anda
+              Log in to your customer account
             </p>
           </div>
 
           {/* Desktop heading */}
           <div className="hidden lg:block mb-10">
             <p className="text-sm text-[#6b6b6b]">
-              Silakan masuk ke portal pelanggan untuk melanjutkan.
+              Please log in to the customer portal to continue.
             </p>
           </div>
 
@@ -430,7 +430,7 @@ export default function CustomerLoginPage() {
           <div className="flex items-center gap-4 mb-6">
             <div className="flex-1 h-px bg-black/[0.10]" />
             <span className="text-[11px] text-[#8a8a8a] uppercase tracking-widest font-medium">
-              atau
+              or
             </span>
             <div className="flex-1 h-px bg-black/[0.10]" />
           </div>
@@ -507,8 +507,8 @@ export default function CustomerLoginPage() {
                   disabled={manualLoading}
                   aria-label={
                     showPassword
-                      ? "Sembunyikan password"
-                      : "Tampilkan password"
+                      ? "Hide password"
+                      : "Show password"
                   }
                   className="absolute right-3.5 top-1/2 -translate-y-1/2
                              text-[#7a7a7a] hover:text-[#1a1a1a] transition-colors
@@ -555,23 +555,23 @@ export default function CustomerLoginPage() {
                 {manualLoading ? (
                   <span className="flex items-center justify-center gap-2">
                     <Loader2 className="h-4 w-4 animate-spin" />
-                    Memproses…
+                    Processing…
                   </span>
                 ) : (
-                  "Masuk"
+                  "Log In"
                 )}
               </Button>
             </div>
 
             {/* Register hint */}
             <p className="text-center text-xs text-[#8a8a8a] leading-relaxed">
-              Belum punya akun?{" "}
+              Don't have an account?{" "}
               <button
                 type="button"
                 onClick={() => router.push("/customer/register")}
                 className="text-blue-600 hover:text-blue-700 transition-colors font-medium"
               >
-                Daftar sekarang
+                Register now
               </button>
             </p>
           </motion.form>

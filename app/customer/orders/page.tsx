@@ -97,7 +97,7 @@ export default function CustomerOrdersPage() {
         const { ok, status, data } = await customerFetch("get-orders")
 
         if (!ok) {
-          setError(`Gagal memuat pesanan (${status})`)
+          setError(`Failed to load orders (${status})`)
           setIsLoading(false)
           return
         }
@@ -108,7 +108,7 @@ export default function CustomerOrdersPage() {
           setOrders([])
         }
       } catch (e) {
-        setError("Terjadi kesalahan jaringan. Silakan coba lagi.")
+        setError("A network error occurred. Please try again.")
       } finally {
         setIsLoading(false)
       }
@@ -120,14 +120,14 @@ export default function CustomerOrdersPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-xl font-bold text-slate-900">Pesanan Saya</h1>
-        <p className="text-slate-500 text-sm mt-1">Riwayat pesanan Anda.</p>
+        <h1 className="text-xl font-bold text-slate-900">My Orders</h1>
+        <p className="text-slate-500 text-sm mt-1">Your order history.</p>
       </div>
 
       {isLoading ? (
         <div className="flex flex-col items-center justify-center py-16 rounded-xl bg-white/50 border border-black/[0.08] backdrop-blur-sm">
           <Loader2 className="h-8 w-8 text-blue-500 animate-spin mb-3" />
-          <p className="text-slate-500 text-sm">Memuat pesanan...</p>
+          <p className="text-slate-500 text-sm">Loading orders...</p>
         </div>
       ) : error ? (
         <div className="rounded-xl bg-white/50 border border-black/[0.08] p-8 text-center backdrop-blur-sm">
@@ -137,15 +137,15 @@ export default function CustomerOrdersPage() {
             onClick={() => window.location.reload()}
             className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm rounded-lg transition-colors"
           >
-            Coba Lagi
+            Try Again
           </button>
         </div>
       ) : orders.length === 0 ? (
         <div className="rounded-xl bg-white/50 border border-black/[0.08] p-8 text-center backdrop-blur-sm">
           <Package className="w-10 h-10 mx-auto text-slate-400 mb-3" />
-          <p className="text-slate-600 text-sm">Belum ada pesanan.</p>
+          <p className="text-slate-600 text-sm">No orders yet.</p>
           <p className="text-slate-400 text-xs mt-1">
-            Pesanan Anda akan tampil di sini setelah melakukan pembelian.
+            Your orders will appear here after you make a purchase.
           </p>
         </div>
       ) : (
@@ -183,7 +183,7 @@ export default function CustomerOrdersPage() {
                     {order.point_earned != null && order.point_earned > 0 && (
                       <p className="text-sm text-amber-500 flex items-center justify-end gap-1 mb-0.5">
                         <Star className="w-3 h-3 fill-amber-500" />
-                        {order.point_earned.toLocaleString("id-ID")} poin
+                        {order.point_earned.toLocaleString("id-ID")} pts
                       </p>
                     )}
                     <p className="text-sm font-semibold text-slate-900">{formatRupiah(computedTotal)}</p>
@@ -247,14 +247,14 @@ export default function CustomerOrdersPage() {
                         <div className="text-right">
                           <p className="text-xs text-slate-400 uppercase tracking-wider mb-1 flex items-center justify-end gap-1">
                             <Star className="w-3 h-3 text-amber-500 fill-amber-500" />
-                            Poin Diperoleh
+                            Points Earned
                           </p>
                           <p className="text-xl font-semibold text-amber-500">
                             +{order.point_earned.toLocaleString("id-ID")}{" "}
-                            <span className="text-xs text-slate-400">poin</span>
+                            <span className="text-xs text-slate-400">pts</span>
                           </p>
                           {order.point_qualifies === false && (
-                            <p className="text-[10px] text-slate-400 mt-1">Eligibility belum terpenuhi</p>
+                            <p className="text-[10px] text-slate-400 mt-1">Eligibility criteria not yet met</p>
                           )}
                         </div>
                       )}

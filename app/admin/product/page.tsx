@@ -2,7 +2,7 @@
 
 import { useState, useCallback, useEffect } from "react"
 import { Plus } from "lucide-react"
-import { useSWR } from "swr"
+import useSWR from "swr"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import {

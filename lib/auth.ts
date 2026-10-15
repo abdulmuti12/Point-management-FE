@@ -25,13 +25,15 @@ export async function adminFetch(endpoint: string, options: RequestInit = {}) {
     ? endpoint
     : `/api/bff/admin/${endpoint.replace(/^\//, "")}`;
 
+  const headers: Record<string, string> = { ...(customHeaders as Record<string, string>) };
+  if (typeof rest.body === "string" && !("Content-Type" in headers)) {
+    headers["Content-Type"] = "application/json";
+  }
+
   const res = await fetch(url, {
     ...rest,
     credentials: "same-origin", // ensure HttpOnly cookies are sent
-    headers: {
-      "Content-Type": "application/json",
-      ...customHeaders,
-    },
+    headers,
   });
 
   const data = await res.json().catch(() => ({}));
@@ -56,13 +58,15 @@ export async function customerFetch(endpoint: string, options: RequestInit = {})
     ? endpoint
     : `/api/bff/customer/${endpoint.replace(/^\//, "")}`;
 
+  const headers: Record<string, string> = { ...(customHeaders as Record<string, string>) };
+  if (typeof rest.body === "string" && !("Content-Type" in headers)) {
+    headers["Content-Type"] = "application/json";
+  }
+
   const res = await fetch(url, {
     ...rest,
     credentials: "same-origin",
-    headers: {
-      "Content-Type": "application/json",
-      ...customHeaders,
-    },
+    headers,
   });
 
   const data = await res.json().catch(() => ({}));

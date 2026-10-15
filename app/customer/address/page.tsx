@@ -74,7 +74,7 @@ export default function CustomerAddressPage() {
   }
 
   async function handleDelete(id: string) {
-    if (!confirm("Hapus alamat ini?")) return
+    if (!confirm("Delete this address?")) return
     try {
       await customerFetch("delete-address-text", {
         method: "POST",
@@ -96,8 +96,8 @@ export default function CustomerAddressPage() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-xl font-bold text-slate-900">Alamat Saya</h1>
-          <p className="text-slate-500 text-sm mt-1">Kelola alamat pengiriman Anda.</p>
+          <h1 className="text-xl font-bold text-slate-900">My Addresses</h1>
+          <p className="text-slate-500 text-sm mt-1">Manage your shipping addresses.</p>
         </div>
         <button
           onClick={() => setShowForm(true)}
@@ -105,14 +105,14 @@ export default function CustomerAddressPage() {
                      text-xs font-medium rounded-lg transition-colors"
         >
           <Plus className="w-3.5 h-3.5" />
-          Tambah Alamat
+          Add Address
         </button>
       </div>
 
       {showForm && (
         <div className="rounded-xl bg-white/50 border border-black/[0.08] p-5 space-y-4 backdrop-blur-sm">
           <div className="flex items-center justify-between">
-            <h2 className="text-sm font-semibold text-slate-900">{editingId ? "Ubah Alamat" : "Tambah Alamat"}</h2>
+            <h2 className="text-sm font-semibold text-slate-900">{editingId ? "Edit Address" : "Add Address"}</h2>
             <button onClick={() => setShowForm(false)} className="text-slate-400 hover:text-slate-600">
               <X className="w-4 h-4" />
             </button>
@@ -120,14 +120,14 @@ export default function CustomerAddressPage() {
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
               <label className="block text-[11px] uppercase tracking-wide text-slate-400 mb-1.5">
-                Alamat
+                Address
               </label>
               <textarea
                 value={form.address}
                 onChange={(e) => setForm({ ...form, address: e.target.value })}
                 required
                 rows={3}
-                placeholder="Jl. Contoh No. 123, Kelurahan, Kecamatan, Kota"
+                placeholder="123 Example St, Sub-district, District, City"
                 className="w-full rounded-lg bg-slate-50 border border-black/[0.08] px-3 py-2.5
                            text-sm text-slate-900 placeholder:text-slate-400
                            focus:outline-none focus:border-blue-500/50 resize-none"
@@ -135,12 +135,12 @@ export default function CustomerAddressPage() {
             </div>
             <div>
               <label className="block text-[11px] uppercase tracking-wide text-slate-400 mb-1.5">
-                Catatan <span className="text-slate-400 normal-case">(opsional)</span>
+                Note <span className="text-slate-400 normal-case">(optional)</span>
               </label>
               <input
                 value={form.note}
                 onChange={(e) => setForm({ ...form, note: e.target.value })}
-                placeholder="Contoh: rumah, kantor, dll."
+                placeholder="e.g. home, office, etc."
                 className="w-full rounded-lg bg-slate-50 border border-black/[0.08] px-3 py-2.5
                            text-sm text-slate-900 placeholder:text-slate-400
                            focus:outline-none focus:border-blue-500/50"
@@ -155,7 +155,7 @@ export default function CustomerAddressPage() {
                            transition-colors"
               >
                 {submitting ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Plus className="w-3.5 h-3.5" />}
-                {editingId ? "Simpan" : "Tambah"}
+                {editingId ? "Save" : "Add"}
               </button>
               <button
                 type="button"
@@ -163,7 +163,7 @@ export default function CustomerAddressPage() {
                 className="rounded-lg border border-black/[0.08] px-4 py-2 text-xs text-slate-500
                            hover:text-slate-700 hover:bg-slate-50 transition-colors"
               >
-                Batal
+                Cancel
               </button>
             </div>
           </form>
@@ -177,9 +177,9 @@ export default function CustomerAddressPage() {
       ) : addresses.length === 0 ? (
         <div className="rounded-xl bg-white/50 border border-black/[0.08] p-8 text-center backdrop-blur-sm">
           <MapPin className="w-10 h-10 mx-auto text-slate-400 mb-3" />
-          <p className="text-slate-600 text-sm">Belum ada alamat tersimpan.</p>
+          <p className="text-slate-600 text-sm">No saved addresses yet.</p>
           <p className="text-slate-400 text-xs mt-1">
-            Tambahkan alamat pengiriman Anda untuk kemudahan transaksi.
+            Add your shipping address for easier transactions.
           </p>
         </div>
       ) : (
@@ -213,14 +213,14 @@ export default function CustomerAddressPage() {
                   {addr.status === "active" && (
                     <span className="text-[10px] font-medium px-2 py-0.5 rounded-full
                                      bg-emerald-500/15 text-emerald-600 border border-emerald-500/25">
-                      Aktif
+                      Active
                     </span>
                   )}
                   <button
                     onClick={() => openEdit(addr)}
                     className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-50
                                transition-colors"
-                    title="Ubah"
+                    title="Edit"
                   >
                     <Pencil className="w-3.5 h-3.5" />
                   </button>
@@ -231,7 +231,7 @@ export default function CustomerAddressPage() {
                         ? "text-slate-400 hover:text-slate-600 hover:bg-slate-50"
                         : "text-emerald-600 hover:text-emerald-500 hover:bg-emerald-50/50"
                     }`}
-                    title={addr.status === "active" ? "Nonaktifkan" : "Jadikan aktif"}
+                    title={addr.status === "active" ? "Deactivate" : "Activate"}
                   >
                     <X className={`w-3.5 h-3.5 ${addr.status === "active" ? "" : "hidden"}`} />
                     <MapPin className={`w-3.5 h-3.5 ${addr.status === "active" ? "hidden" : ""}`} />
@@ -240,7 +240,7 @@ export default function CustomerAddressPage() {
                     onClick={() => handleDelete(addr.id)}
                     className="p-1.5 rounded-lg text-slate-400 hover:text-red-500 hover:bg-red-50/60
                                transition-colors"
-                    title="Hapus"
+                    title="Delete"
                   >
                     <Trash2 className="w-3.5 h-3.5" />
                   </button>
@@ -253,7 +253,7 @@ export default function CustomerAddressPage() {
 
       {activeCount === 0 && addresses.length > 0 && (
         <p className="text-xs text-amber-600">
-          Tidak ada alamat aktif. Aktivkan salah satu alamat di atas untuk pengiriman.
+          No active address. Activate one of the addresses above for shipping.
         </p>
       )}
     </div>

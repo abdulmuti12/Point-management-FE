@@ -124,10 +124,10 @@ export default function LoginPage() {
         localStorage.setItem("user_email", data.data?.email || email);
         setTimeout(() => router.push("/admin"), 600);
       } else {
-        setError(data.message || "Email atau password salah. Silakan periksa kembali.");
+        setError(data.message || "Email or password is incorrect. Please check and try again.");
       }
     } catch {
-      setError("Terjadi kesalahan jaringan. Hubungi admin bila masalah berlanjut.");
+      setError("A network error occurred. Contact your system administrator if the issue persists.");
     } finally {
       setIsLoading(false);
     }
@@ -180,7 +180,7 @@ export default function LoginPage() {
             <span className="text-blue-400"> Management</span>
           </h1>
           <p className="text-sm leading-relaxed text-slate-500">
-            Panel terpadu untuk mengelola titik, aktivitas, dan operasional
+            Integrated panel for managing points, activities, and operations
           </p>
 
           {/* subtle bottom hint */}
@@ -271,7 +271,7 @@ export default function LoginPage() {
                   type="button"
                   onClick={() => setShowPassword((v) => !v)}
                   disabled={isLoading}
-                  aria-label={showPassword ? "Sembunyikan password" : "Tampilkan password"}
+                  aria-label={showPassword ? "Hide password" : "Show password"}
                   className="absolute right-3.5 top-1/2 -translate-y-1/2
                              text-slate-500 hover:text-slate-300 transition-colors"
                 >
@@ -298,17 +298,17 @@ export default function LoginPage() {
                 {isLoading ? (
                   <span className="flex items-center justify-center gap-2">
                     <Loader2 className="h-4 w-4 animate-spin" />
-                    Memproses…
+                    Processing…
                   </span>
                 ) : (
-                  "Masuk"
+                  "Log In"
                 )}
               </Button>
             </div>
 
             {/* Footer hint */}
             <p className="text-center text-xs text-slate-600 leading-relaxed pt-2">
-              Lupa password? Hubungi admin sistem Anda
+              Forgot your password? Contact your system administrator
             </p>
           </form>
         </div>

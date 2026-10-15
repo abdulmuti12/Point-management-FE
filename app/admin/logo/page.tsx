@@ -129,7 +129,10 @@ export default function LogoPage() {
         return "/placeholder.svg?height=100&width=100"
       }
       if (filePath.startsWith("http://") || filePath.startsWith("https://")) {
-        return filePath
+        // Route through the same-origin BFF storage proxy — an external
+        // :8001/storage URL would be blocked by CORS on some hosts.
+        const u = new URL(filePath)
+        return `/api/bff/storage/${u.pathname.replace(/^\/storage\//, "")}`
       }
       return `${STORAGE_BASE_URL}${filePath}`
     },

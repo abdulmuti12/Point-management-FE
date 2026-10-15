@@ -103,7 +103,7 @@ export default function CustomerAccountPage() {
   if (loading) {
     return (
       <div className="p-6">
-        <div className="text-sm text-slate-500">Memuat akun…</div>
+        <div className="text-sm text-slate-500">Loading account…</div>
       </div>
     )
   }
@@ -111,7 +111,7 @@ export default function CustomerAccountPage() {
   return (
     <div className="p-6 space-y-6 max-w-2xl">
       <div>
-        <h1 className="text-xl font-bold text-slate-900 mb-4">Akun Saya</h1>
+        <h1 className="text-xl font-bold text-slate-900 mb-4">My Account</h1>
         <div className="rounded-xl bg-white/50 border border-black/[0.08] p-5 space-y-4 backdrop-blur-sm">
           <div className="flex items-center gap-3">
             {customer.avatar ? (
@@ -143,16 +143,16 @@ export default function CustomerAccountPage() {
           </div>
 
           <div className="border-t border-black/[0.08] pt-4 space-y-3">
-            <InfoRow icon={<User className="w-4 h-4 shrink-0" />} label="Nama Lengkap">
-              {customer.full_name || customer.name || "Nama tidak diketahui"}
+            <InfoRow icon={<User className="w-4 h-4 shrink-0" />} label="Full Name">
+              {customer.full_name || customer.name || "Name not available"}
             </InfoRow>
             <InfoRow icon={<Mail className="w-4 h-4 shrink-0" />} label="Email">
-              {customer.email || "Email tidak diketahui"}
+              {customer.email || "Email not available"}
             </InfoRow>
-            <InfoRow icon={<Phone className="w-4 h-4 shrink-0" />} label="Nomor Telepon">
+            <InfoRow icon={<Phone className="w-4 h-4 shrink-0" />} label="Phone Number">
               {customer.phone_number || "—"}
             </InfoRow>
-            <InfoRow icon={<Shield className="w-4 h-4 shrink-0" />} label="Sumber">
+            <InfoRow icon={<Shield className="w-4 h-4 shrink-0" />} label="Source">
               {customer.provider ? customer.provider.charAt(0).toUpperCase() + customer.provider.slice(1) : "—"}
             </InfoRow>
             <InfoRow
@@ -163,12 +163,12 @@ export default function CustomerAccountPage() {
                   <Shield className="w-4 h-4 shrink-0" />
                 )
               }
-              label="Verifikasi Email"
+              label="Email Verification"
             >
               {customer.email_verified_at ? (
-                <span className="text-emerald-600">Terverifikasi</span>
+                <span className="text-emerald-600">Verified</span>
               ) : (
-                <span className="text-slate-500">Belum diverifikasi</span>
+                <span className="text-slate-500">Not verified</span>
               )}
             </InfoRow>
           </div>

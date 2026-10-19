@@ -576,7 +576,7 @@ function MemberLevelCard({
               <img
                 src={storageProxyUrl(level.image_url) || level.image_url}
                 alt={level.name}
-                className="w-full h-full object-contain"
+                className="w-full h-full object-cover"
                 loading="lazy"
                 onError={(e) => { (e.target as HTMLImageElement).style.display = "none" }}
               />
@@ -849,7 +849,7 @@ function MemberLevelModal({
                 <img
                   src={storageProxyUrl(level.image_url) || level.image_url}
                   alt={level.name}
-                  className="w-full max-h-[70vh] object-contain"
+                  className="w-full max-h-[70vh] object-cover"
                   onError={(e) => { (e.target as HTMLImageElement).style.display = "none" }}
                 />
               ) : (

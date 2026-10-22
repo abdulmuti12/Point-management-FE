@@ -1,6 +1,5 @@
 /** @type {import('next').NextConfig} */
 const securityHeaders = [
-  // Defense-in-depth: also set headers here in case middleware is bypassed.
   { key: 'Strict-Transport-Security', value: 'max-age=31536000; includeSubDomains; preload' },
   { key: 'X-Frame-Options', value: 'SAMEORIGIN' },
   { key: 'X-Content-Type-Options', value: 'nosniff' },
@@ -30,19 +29,18 @@ const nextConfig = {
   typescript: {
     ignoreBuildErrors: true,
   },
-  // Hide the X-Powered-By: Next.js header.
   poweredByHeader: false,
   images: {
     unoptimized: true,
     domains: ['localhost'],
-     remotePatterns: [
-    {
-      protocol: 'http',
-      hostname: 'localhost',
-      port: '8000',
-      pathname: '/**',
-    },
-  ],
+    remotePatterns: [
+      {
+        protocol: 'http',
+        hostname: 'localhost',
+        port: '8000',
+        pathname: '/**',
+      },
+    ],
   },
   async headers() {
     return [
@@ -52,6 +50,11 @@ const nextConfig = {
       },
     ]
   },
+  // ── No API rewrites ──────────────────────────────────────────────
+  // All FE API calls go through /api/bff/*, handled by the Next.js BFF
+  // route handlers under app/api/bff/. A previous /api/:path* → Go API
+  // rewrite intercepted BFF routes (rewrites run before route handlers)
+  // and 404-d on the Go API's nonexistent /api/bf/* namespace.
 }
 
 module.exports = nextConfig

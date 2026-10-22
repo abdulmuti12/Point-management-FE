@@ -22,7 +22,7 @@ const MIME: Record<string, string> = {
 // Override with API_STORAGE_DIR if the API lives somewhere else.
 const STORAGE_ROOT = process.env.API_STORAGE_DIR
   ? normalize(process.env.API_STORAGE_DIR)
-  : "/Applications/XAMPP/xamppfiles/htdocs/point-project/Royalti-Go/storage/app/public";
+  : "/var/www/html/Royalti-Go/storage/app/public";
 
 export async function GET(req: NextRequest, ctx: { params: Promise<{ path: string[] }> }) {
   const { path } = await ctx.params;

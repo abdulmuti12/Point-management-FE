@@ -9,11 +9,7 @@ import { Label } from "@/components/ui/label"
 import { Eye, EyeOff, Loader2, Lock, Mail } from "lucide-react"
 
 const API_BASE_URL = (process.env.NEXT_PUBLIC_API_URL || "").replace(/\/$/, "")
-const STORAGE_BASE_URL = process.env.NEXT_PUBLIC_STORAGE_URL
-  ? `${process.env.NEXT_PUBLIC_STORAGE_URL.replace(/\/$/, "")}/`
-  : API_BASE_URL
-    ? `${API_BASE_URL.replace(/\/api$/, "")}/storage/`
-    : "http://127.0.0.1:8000/storage/"
+const STORAGE_BASE_URL = "/api/bff/storage/"
 
 /* ── small helpers ───────────────────────────────────────────── */
 function resolveLogoUrl(filePath: string) {

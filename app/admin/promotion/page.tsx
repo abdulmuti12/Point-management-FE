@@ -107,8 +107,8 @@ export default function PromotionPage() {
       return filePath
     }
 
-    // If it's a relative path, construct the full URL
-    return `http://127.0.0.1:8000/storage/${filePath}`
+    // Use the BFF storage proxy — safe in dev and prod regardless of API host
+    return `/api/bff/storage/${filePath}`
   }
 
   const getTypeVariant = (type: string) => {

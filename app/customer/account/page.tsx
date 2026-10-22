@@ -4,9 +4,7 @@ import { useEffect, useState } from "react"
 import { User, Mail, Phone, ShieldCheck, Shield } from "lucide-react"
 import { customerFetch } from "@/lib/auth"
 
-const STORAGE_BASE_URL = process.env.NEXT_PUBLIC_STORAGE_URL
-  ? `${process.env.NEXT_PUBLIC_STORAGE_URL.replace(/\/$/, "")}/`
-  : "http://127.0.0.1:8000/storage/"
+const STORAGE_BASE_URL = "/api/bff/storage/"
 
 function InfoRow({
   icon,

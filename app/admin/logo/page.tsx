@@ -31,11 +31,7 @@ import { adminFetch } from "@/lib/auth"
 
 const API_ROOT_URL = (process.env.NEXT_PUBLIC_API_URL || "").replace(/\/$/, "")
 const API_BASE_URL = "admins"
-const STORAGE_BASE_URL = process.env.NEXT_PUBLIC_STORAGE_URL
-  ? `${process.env.NEXT_PUBLIC_STORAGE_URL.replace(/\/$/, "")}/`
-  : API_ROOT_URL
-    ? `${API_ROOT_URL.replace(/\/api$/, "")}/storage/`
-    : "http://127.0.0.1:8000/storage/"
+const STORAGE_BASE_URL = "/api/bff/storage/"
 
 interface Logo {
   id?: number

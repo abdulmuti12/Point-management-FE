@@ -441,9 +441,16 @@ export default function RolePage() {
       setEditMessage("")
 
       const result = await adminFetch(`admins/get-edit-role/${roleId}`)
-      const data = result.data
+      const data = result.data as {
+        success?: boolean
+        message?: string
+        data?: {
+          name: string
+          menus: Array<{ id: number; name: string; selected: boolean }>
+        }
+      }
 
-      if (result.ok && data.success) {
+      if (result.ok && data.success && data.data) {
         setEditRoleData(data.data)
         const initialSelectedMenus = data.data.menus.filter((menu) => menu.selected).map((menu) => menu.id)
         setSelectedEditMenus(initialSelectedMenus)

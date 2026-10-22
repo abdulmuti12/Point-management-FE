@@ -405,7 +405,7 @@ export function ProductFormDialog({
     ? Object.fromEntries(
         Object.entries(existingImages).map(([k, v]) => [
           k,
-          (images as Record<string, File | null>)[k] ? undefined : v,
+          images[k as keyof ImageUploadValue] ? undefined : v,
         ]),
       )
     : undefined

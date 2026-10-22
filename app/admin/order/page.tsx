@@ -74,7 +74,7 @@ interface OrderDetail {
   id: number
   order_number: string
   date: string
-  status: "pending" | "processing" | "shipped" | "delivered" | "cancelled"
+  status: "pending" | "processing" | "shipped" | "delivered" | "cancelled" | "success"
   notes: string | null
   customer: OrderCustomer
   shipping: ShippingInfo
@@ -92,7 +92,7 @@ interface Order {
   id: number
   order_number: string
   date: string
-  status: "pending" | "processing" | "shipped" | "delivered" | "cancelled"
+  status: "pending" | "processing" | "shipped" | "delivered" | "cancelled" | "success"
   customer: OrderCustomer
   subtotal: number
   shipping_cost: number

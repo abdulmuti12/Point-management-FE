@@ -44,9 +44,7 @@ const inputCls = `
 const labelCls = "text-[11px] font-semibold text-[#6b6b6b] uppercase tracking-[0.12em] mb-1.5 block"
 
 /* ── helpers (replicated from login page) ──────────────────── */
-const STORAGE_BASE_URL = process.env.NEXT_PUBLIC_STORAGE_URL
-  ? `${process.env.NEXT_PUBLIC_STORAGE_URL.replace(/\/$/, "")}/`
-  : "http://127.0.0.1:8000/storage/"
+const STORAGE_BASE_URL = "/api/bff/storage/"
 
 function resolveLogoUrl(filePath: string) {
   if (/^https?:\/\//.test(filePath) || filePath.startsWith("/")) return filePath

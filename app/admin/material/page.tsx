@@ -141,17 +141,9 @@ export default function MaterialPage() {
       return filePath
     }
 
-    // Base URL for the Laravel storage
-    // const baseUrl = "http://127.0.0.1:8000/storage"
-    const baseUrl = process.env.NEXT_PUBLIC_STORAGE_URL ? process.env.NEXT_PUBLIC_STORAGE_URL: "http://127.0.0.1:8000/storage/"
-
-
-    // Handle different path formats
-    if (filePath.startsWith("/")) {
-      return `${baseUrl}${filePath}`
-    } else {
-      return `${baseUrl}/${filePath}`
-    }
+    // Use BFF storage proxy — safe in dev and prod regardless of API host
+    const clean = filePath.startsWith("/") ? filePath.slice(1) : filePath
+    return `/api/bff/storage/${clean}`
   }
 
   // Toast notification functions

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createReadStream, existsSync } from "fs";
+import { createReadStream, existsSync, lstatSync } from "fs";
 import { isAbsolute, normalize, join } from "path";
 import { Readable } from "stream";
 
@@ -52,6 +52,14 @@ export async function GET(req: NextRequest, ctx: { params: Promise<{ path: strin
   }
 
   if (!existsSync(normalized)) {
+    return NextResponse.json({ success: false, message: "File not found" }, { status: 404 });
+  }
+  try {
+    if (lstatSync(normalized).isSymbolicLink()) {
+      return NextResponse.json({ success: false, message: "Forbidden" }, { status: 403 });
+    }
+  } catch {
+    // stat raced with deletion; fall through to 404
     return NextResponse.json({ success: false, message: "File not found" }, { status: 404 });
   }
 

@@ -307,11 +307,8 @@ export default function CategoryPage() {
     // If it's already a full URL, return as is
     if (imagePath.startsWith("http")) return imagePath
 
-    // Otherwise, construct the full URL
-    // return `http://31.97.67.48:8000/storage/${imagePath}`
-
-    const storageBase = process.env.NEXT_PUBLIC_STORAGE_URL ?? "http://31.97.67.48:8000"
-    return `${storageBase.replace(/\/$/, '')}/storage/${imagePath}`
+    // Use BFF storage proxy — no hardcoded IP, works in dev and prod
+    return `/api/bff/storage/${imagePath}`
 
   }
 

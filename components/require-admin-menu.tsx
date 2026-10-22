@@ -17,7 +17,7 @@ import { Button } from "@/components/ui/button"
 const ADMIN_PAGE_MENU: Record<string, string | null> = {
   "/admin": "admin",
   "/admin/admin": "admin/admin",
-  "/admin/account": "admin/account",
+  "/admin/account": null, // every logged-in admin can view their own profile
   "/admin/role": "admin/role",
   "/admin/category": "admin/category",
   "/admin/brand": "admin/brand",

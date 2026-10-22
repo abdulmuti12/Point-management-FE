@@ -24,8 +24,7 @@ import {
 } from "@/components/ui/table"
 import type { Product } from "@/lib/types"
 
-const STORAGE_BASE_URL =
-  process.env.NEXT_PUBLIC_STORAGE_URL || "http://127.0.0.1:8000/storage/"
+const STORAGE_BASE_URL = "/api/bff/storage/"
 
 export function getImageUrl(filePath: string | null): string {
   if (!filePath) return "/placeholder.svg?height=100&width=100"

@@ -563,7 +563,7 @@ export default function CustomerLoginPage() {
 
             {/* Register hint */}
             <p className="text-center text-xs text-[#8a8a8a] leading-relaxed">
-              Don't have an account?{" "}
+              Don&apos;t have an account?{" "}
               <button
                 type="button"
                 onClick={() => router.push("/customer/register")}

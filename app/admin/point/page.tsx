@@ -856,7 +856,7 @@ export default function PointPage() {
           {/* Search Info */}
           {searchValue && (
             <div className="text-sm text-slate-600 bg-slate-50 p-3 rounded-lg">
-              Searching for point name "{searchValue}"
+              Searching for point name &quot;{searchValue}&quot;
               {totalItems > 0 && ` - Found ${totalItems} result${totalItems > 1 ? "s" : ""}`}
             </div>
           )}
@@ -1178,7 +1178,7 @@ export default function PointPage() {
                     <div className="text-sm text-red-800">
                       <p className="font-medium">Are you sure you want to delete this point?</p>
                       <p className="mt-1">
-                        Point "{pointToDelete.name}" will be permanently removed from the system.
+                        Point &quot;{pointToDelete.name}&quot; will be permanently removed from the system.
                       </p>
                     </div>
                   </div>

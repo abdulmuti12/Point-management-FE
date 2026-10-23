@@ -122,7 +122,7 @@ export default function DashboardPage() {
     <div className="flex-1 space-y-6 p-6">
       <div>
         <h1 className="text-3xl font-bold text-slate-900">Dashboard</h1>
-        <p className="text-slate-600 mt-2">Welcome back! Here's what's happening with your admin panel.</p>
+        <p className="text-slate-600 mt-2">Welcome back! Here&apos;s what&apos;s happening with your admin panel.</p>
       </div>
 
       <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">

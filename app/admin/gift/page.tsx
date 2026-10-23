@@ -838,7 +838,7 @@ export default function GiftPage() {
 
           {searchValue && (
             <div className="text-sm text-slate-600 bg-slate-50 p-3 rounded-lg">
-              Searching for gift name "{searchValue}"
+              Searching for gift name &quot;{searchValue}&quot;
               {totalItems > 0 && ` - Found ${totalItems} result${totalItems > 1 ? "s" : ""}`}
             </div>
           )}
@@ -1202,7 +1202,7 @@ export default function GiftPage() {
                     <XCircle className="w-5 h-5 text-red-600 mt-0.5 flex-shrink-0" />
                     <div className="text-sm text-red-800">
                       <p className="font-medium">Are you sure you want to delete this gift?</p>
-                      <p className="mt-1">Gift "{giftToDelete.name}" will be permanently removed from the system.</p>
+                      <p className="mt-1">Gift &quot;{giftToDelete.name}&quot; will be permanently removed from the system.</p>
                     </div>
                   </div>
                 </div>

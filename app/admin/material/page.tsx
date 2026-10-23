@@ -883,7 +883,7 @@ export default function MaterialPage() {
           {/* Search Info */}
           {searchValue && (
             <div className="text-sm text-slate-600 bg-slate-50 p-3 rounded-lg">
-              Searching for material name "{searchValue}"
+              Searching for material name &quot;{searchValue}&quot;
               {totalItems > 0 && ` - Found ${totalItems} result${totalItems > 1 ? "s" : ""}`}
             </div>
           )}
@@ -1267,7 +1267,7 @@ export default function MaterialPage() {
                     <div className="text-sm text-red-800">
                       <p className="font-medium">Are you sure you want to delete this material?</p>
                       <p className="mt-1">
-                        Material "{materialToDelete.name}" will be permanently removed from the system.
+                        Material &quot;{materialToDelete.name}&quot; will be permanently removed from the system.
                       </p>
                     </div>
                   </div>

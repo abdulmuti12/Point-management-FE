@@ -799,7 +799,7 @@ export default function CategoryPage() {
           {/* Search Info */}
           {searchValue && (
             <div className="text-sm text-slate-600 bg-slate-50 p-3 rounded-lg">
-              Searching for category name "{searchValue}"
+              Searching for category name &quot;{searchValue}&quot;
               {totalItems > 0 && ` - Found ${totalItems} result${totalItems > 1 ? "s" : ""}`}
             </div>
           )}
@@ -1114,7 +1114,7 @@ export default function CategoryPage() {
                     <div className="text-sm text-red-800">
                       <p className="font-medium">Are you sure you want to delete this category?</p>
                       <p className="mt-1">
-                        Category "{categoryToDelete.name}" will be permanently removed from the system.
+                        Category &quot;{categoryToDelete.name}&quot; will be permanently removed from the system.
                       </p>
                     </div>
                   </div>

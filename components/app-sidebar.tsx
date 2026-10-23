@@ -153,5 +153,5 @@ export function AppSidebar() {
         <div className="text-xs text-slate-500 text-center">© 2026 Marcomm Team</div>
       </SidebarFooter>
     </Sidebar>
-  )d
+  )
 }

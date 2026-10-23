@@ -1560,7 +1560,7 @@ export default function CampaignPage() {
                 <div>
                   <p className="font-medium text-red-800">Are you sure you want to delete this campaign?</p>
                   <p className="text-sm text-red-700 mt-1">
-                    Campaign "{campaignToDelete?.name}" will be permanently removed from the system.
+                    Campaign &quot;{campaignToDelete?.name}&quot; will be permanently removed from the system.
                   </p>
                 </div>
               </div>

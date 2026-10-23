@@ -714,7 +714,7 @@ export default function BrandPage() {
                   placeholder="https://example.com"
                   disabled={isCreatingBrand}
                 />
-                <p className="text-xs text-slate-500">Enter the brand's website URL (optional)</p>
+                <p className="text-xs text-slate-500">Enter the brand&apos;s website URL (optional)</p>
               </div>
 
               <div className="grid gap-2">
@@ -877,7 +877,7 @@ export default function BrandPage() {
           {/* Search Info */}
           {searchValue && (
             <div className="text-sm text-slate-600 bg-slate-50 p-3 rounded-lg">
-              Searching for brand name "{searchValue}"
+              Searching for brand name &quot;{searchValue}&quot;
               {totalItems > 0 && ` - Found ${totalItems} result${totalItems > 1 ? "s" : ""}`}
             </div>
           )}
@@ -1264,7 +1264,7 @@ export default function BrandPage() {
                     <XCircle className="w-5 h-5 text-red-600 mt-0.5 flex-shrink-0" />
                     <div className="text-sm text-red-800">
                       <p className="font-medium">Are you sure you want to delete this brand?</p>
-                      <p className="mt-1">Brand "{brandToDelete.name}" will be permanently removed from the system.</p>
+                      <p className="mt-1">Brand &quot;{brandToDelete.name}&quot; will be permanently removed from the system.</p>
                     </div>
                   </div>
                 </div>
@@ -1338,7 +1338,7 @@ export default function BrandPage() {
                   placeholder="https://example.com"
                   disabled={isEditingBrand}
                 />
-                <p className="text-xs text-slate-500">Enter the brand's website URL (optional)</p>
+                <p className="text-xs text-slate-500">Enter the brand&apos;s website URL (optional)</p>
               </div>
 
               <div className="grid gap-2">

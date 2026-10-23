@@ -802,7 +802,7 @@ export default function AdminPage() {
           {/* Search Info */}
           {searchValue && (
             <div className="text-sm text-slate-600 bg-slate-50 p-3 rounded-lg">
-              Searching for "{searchValue}" in {searchType} field
+              Searching for &quot;{searchValue}&quot; in {searchType} field
               {totalItems > 0 && ` - Found ${totalItems} result${totalItems > 1 ? "s" : ""}`}
             </div>
           )}

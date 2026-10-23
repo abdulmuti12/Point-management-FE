@@ -1,14 +1,13 @@
 #!/usr/bin/env bash
 # deploy.sh — Point-management-FE production deployment
 #
-# Usage (non-interactive SSH, run as root):
-#   DEPLOY_COMMIT="<sha>" bash /var/www/html/Point-management-FE-deploy/scripts/deploy.sh
+# Invoked by the GitHub Actions workflow (.github/workflows/deploy.yml)
+# via:  DEPLOY_COMMIT="<sha>" REPO_URL="<url>" bash /var/www/html/Point-management-FE-deploy/scripts/deploy.sh
 #
-# Required env vars:
-#   DEPLOY_COMMIT  — full 40-char git SHA to deploy
-#
-# Optional env vars:
-#   REPO_URL       — git remote URL (default: git@github.com:abdulmuti12/point-management-frontend.git)
+# Every stage is logged as:
+#   [stage] description
+#   FATAL [stage] line N: reason (exit code X)
+# Secrets are never echoed and never expand into logs (no set -x).
 
 set -euo pipefail
 
@@ -28,106 +27,128 @@ HEALTH_URL="http://127.0.0.1:${PORT}"
 HEALTH_RETRIES=15
 HEALTH_SLEEP=3
 
-# ── Validation ────────────────────────────────────────────────────────────────
-if [[ -z "${DEPLOY_COMMIT}" ]]; then
-  echo "ERROR: DEPLOY_COMMIT env var is required (full 40-char git SHA)"
-  exit 1
-fi
-[[ "${DEPLOY_COMMIT}" =~ ^[0-9a-f]{40}$ ]] || {
-  echo "ERROR: DEPLOY_COMMIT must be a full 40-char SHA, got: ${DEPLOY_COMMIT}"
+# ── Helpers: stage + fatal diagnostics ────────────────────────────────────────
+STAGE=""
+stage() { STAGE="$1"; echo ""; echo "==== [$STAGE] $2 ===="; }
+fatal() { # $1=reason  $2=optional context (never include secrets)
+  echo ""
+  echo "FATAL [${STAGE:-startup}] line ${1:-?}: $2"
   exit 1
 }
 
-# ── Lock ──────────────────────────────────────────────────────────────────────
-if [[ -e "${LOCK_FILE}" ]]; then
-  echo "ERROR: Another deployment is in progress (lock exists: ${LOCK_FILE})"
-  echo "  If the lock is stale, remove it: rm ${LOCK_FILE}"
-  exit 1
-fi
+trap 'echo "FATAL [${STAGE:-script}] line $LINENO: command failed (exit ${?}): ${BASH_COMMAND}"' ERR
 trap 'rm -f "${LOCK_FILE}"' EXIT
-echo $$ > "${LOCK_FILE}"
 
+# ── [0] Config validation ─────────────────────────────────────────────────────
+stage 0 "Config validation"
+echo "  deploy base: ${DEPLOY_BASE}"
+echo "  commit:      ${DEPLOY_COMMIT:-<unset>}"
+echo "  repo url:    ${REPO_URL}"
+echo "  port:        ${PORT}"
+
+[[ -d "${DEPLOY_BASE}" ]] || fatal 0 "${DEPLOY_BASE} does not exist"
+[[ -d "${SHARED_DIR}" ]] || fatal 0 "${SHARED_DIR} does not exist"
+
+if [[ -z "${DEPLOY_COMMIT}" ]]; then
+  fatal 0 "DEPLOY_COMMIT env var is required (full 40-char git SHA)"
+fi
+[[ "${DEPLOY_COMMIT}" =~ ^[0-9a-f]{40}$ ]] || {
+  fatal 0 "DEPLOY_COMMIT must be a full 40-char hex SHA, got: ${DEPLOY_COMMIT:0:12}…"
+}
+if [[ ! -f "${SHARED_DIR}/env/.env.production" ]]; then
+  fatal 0 "${SHARED_DIR}/env/.env.production not found — set it up first"
+fi
+
+# ── [1] Tool availability in this non-interactive session ────────────────────
+stage 1 "Tool availability"
+echo "  HOME=${HOME}  PATH=${PATH}"
+for tool in node npm pm2 git ssh rsync; do
+  if ! command -v "${tool}" >/dev/null 2>&1; then
+    fatal 1 "${tool} not found in PATH"
+  fi
+  echo "  ${tool}: $(command -v ${tool})"
+done
+node --version
+pm2 --version
+
+# ── [2] Lock ──────────────────────────────────────────────────────────────────
+stage 2 "Lock"
+if [[ -e "${LOCK_FILE}" ]]; then
+  HOLDER=$(cat "${LOCK_FILE}" 2>/dev/null || echo "?")
+  if kill -0 "${HOLDER}" 2>/dev/null; then
+    fatal 2 "another deployment is in progress (lock held by pid ${HOLDER})"
+  fi
+  echo "  stale lock from dead pid ${HOLDER} — removing"
+  rm -f "${LOCK_FILE}"
+fi
+mkdir -p "${LOG_DIR}"
+echo $$ > "${LOCK_FILE}"
 RELEASE_ID="${DEPLOY_COMMIT:0:12}-$(date +%Y%m%d%H%M%S)"
 RELEASE_DIR="${RELEASES_DIR}/${RELEASE_ID}"
 PREV_CURRENT=""
-
-echo "=== Point-management-FE deployment starting ==="
-echo "  commit:  ${DEPLOY_COMMIT}"
 echo "  release: ${RELEASE_ID}"
-echo "  dir:     ${RELEASE_DIR}"
 
-# ── Preflight checks ──────────────────────────────────────────────────────────
-command -v node >/dev/null 2>&1 || { echo "ERROR: node not found in PATH"; exit 1; }
-command -v npm  >/dev/null 2>&1 || { echo "ERROR: npm not found in PATH"; exit 1; }
-command -v pm2  >/dev/null 2>&1 || { echo "ERROR: pm2 not found in PATH"; exit 1; }
-command -v git  >/dev/null 2>&1 || { echo "ERROR: git not found in PATH"; exit 1; }
-
-if [[ ! -f "${SHARED_DIR}/env/.env.production" ]]; then
-  echo "ERROR: ${SHARED_DIR}/env/.env.production not found. Set it up first."
-  exit 1
-fi
-
-# ── [1] Create release directory ─────────────────────────────────────────────
-echo "[1/7] Creating release directory: ${RELEASE_ID}"
+# ── [3] Create release directory ──────────────────────────────────────────────
+stage 3 "Create release directory"
 rm -rf "${RELEASE_DIR}"
 mkdir -p "${RELEASE_DIR}"
 
-# ── [2] Clone / checkout the exact commit ────────────────────────────────────
-echo "[2/7] Cloning repo and checking out ${DEPLOY_COMMIT}"
+# ── [4] Clone / checkout the exact commit ─────────────────────────────────────
+stage 4 "Checkout ${DEPLOY_COMMIT}"
 git clone --quiet --no-checkout "${REPO_URL}" "${RELEASE_DIR}/src" 2>&1 || {
-  echo "ERROR: git clone failed. Check REPO_URL and server SSH access."
-  exit 1
+  fatal 4 "git clone failed (repo: ${REPO_URL})"
 }
 cd "${RELEASE_DIR}/src"
-# Ensure the exact commit is available even in a shallow clone
+# Ensure the exact commit is available even in a shallow/partial clone
 if ! git cat-file -e "${DEPLOY_COMMIT}" 2>/dev/null; then
-  echo "  commit not in shallow clone, fetching..."
+  echo "  commit not in clone, fetching…"
   git fetch --quiet --depth 1 origin "${DEPLOY_COMMIT}"
 fi
 git checkout --quiet "${DEPLOY_COMMIT}"
-echo "  HEAD is now: $(git log -1 --format='%h %s')"
+echo "  HEAD: $(git log -1 --format='%h %s')"
 
-# ── [3] Prepare shared resources ─────────────────────────────────────────────
-echo "[3/7] Preparing shared environment"
+# ── [5] Prepare shared resources ───────────────────────────────────────────────
+stage 5 "Shared environment"
 cp "${SHARED_DIR}/env/.env.production" "${RELEASE_DIR}/src/.env.local"
+echo "  .env.local in place (contents never logged)"
 
-# ── [4] Install dependencies ─────────────────────────────────────────────────
-echo "[4/7] Installing dependencies (npm ci — uses package-lock.json)"
+# ── [6] Install dependencies ──────────────────────────────────────────────────
+stage 6 "npm ci"
 npm ci --prefix "${RELEASE_DIR}/src" 2>&1 | tail -15
 
-# ── [5] Build ────────────────────────────────────────────────────────────────
-echo "[5/7] Running production build (next build, output: standalone)"
+# ── [7] Build ──────────────────────────────────────────────────────────────────
+stage 7 "next build (standalone)"
+# Keep fe-point on the currently active release during the whole build.
+echo "  active release during build: $(readlink ${CURRENT_LINK} 2>/dev/null || echo 'none')"
 npm run build --prefix "${RELEASE_DIR}/src" 2>&1 | tail -30
 
-# Verify build produced a valid standalone server
 if [[ ! -f "${RELEASE_DIR}/src/.next/standalone/server.js" ]]; then
-  echo "ERROR: .next/standalone/server.js not found after build — aborting before activation"
-  exit 1
+  fatal 7 ".next/standalone/server.js not found after build"
 fi
 
-# Copy client assets into standalone tree. Next's standalone output contains
+# Copy client assets into the standalone tree. Next's standalone output holds
 # only server-runtime files; without .next/static the server 404s every
-# /_next/static/chunks/* request (login page white-screens, browser refuses
-# the HTML-bodied 404 as a script).
+# /_next/static/chunks/* request and the app white-screens.
 cp -r "${RELEASE_DIR}/src/.next/static" "${RELEASE_DIR}/src/.next/standalone/.next/static" || {
-  echo "ERROR: failed to copy .next/static into standalone tree"
-  exit 1
+  fatal 7 "failed to copy .next/static into standalone tree"
 }
-echo "  Build OK: ${RELEASE_DIR}/src/.next/standalone/server.js (+ static assets copied)"
 
-# ── [6] Activate: point PM2 at new release ───────────────────────────────────
-echo "[6/7] Activating release ${RELEASE_ID}"
+# Copy public/ if present (favicon, robots.txt, etc. are served from it).
+if [[ -d "${RELEASE_DIR}/src/public" ]]; then
+  cp -r "${RELEASE_DIR}/src/public" "${RELEASE_DIR}/src/.next/standalone/public" || {
+    fatal 7 "failed to copy public/ into standalone tree"
+  }
+fi
+echo "  Build OK: server.js + .next/static (+ public) ready"
 
-# Remember what was active so we can roll back
+# ── [8] Activate: point PM2 at the new release ───────────────────────────────
+stage 8 "Activate ${RELEASE_ID}"
 if [[ -L "${CURRENT_LINK}" ]]; then
   PREV_CURRENT="$(readlink "${CURRENT_LINK}")"
 fi
 echo "  previous current: ${PREV_CURRENT:-none}"
-
-# Atomically swap the symlink
 ln -sfn "${RELEASE_DIR}" "${CURRENT_LINK}"
 
-# Write the ecosystem config for this release (using standalone server.js)
 ECOSYSTEM_NEW="${RELEASE_DIR}/ecosystem.config.js"
 cat > "${ECOSYSTEM_NEW}" <<EOF
 module.exports = {
@@ -152,15 +173,14 @@ module.exports = {
 };
 EOF
 
-# Stop the old process (releases port), start the new one
 pm2 delete fe-point >/dev/null 2>&1 || true
-pm2 start "${ECOSYSTEM_NEW}" >/dev/null 2>&1
-echo "  PM2 restarted fe-point → ${RELEASE_DIR}"
+pm2 start "${ECOSYSTEM_NEW}" || fatal 8 "pm2 start failed"
+echo "  PM2 started fe-point → ${RELEASE_DIR}"
 
-# ── [7] Health check ──────────────────────────────────────────────────────────
-echo "[7/7] Health check via HTTP on port ${PORT}"
+# ── [9] Health check via HTTP on port ${PORT} ─────────────────────────────────
+stage 9 "Health check (${HEALTH_RETRIES} attempts × ${HEALTH_SLEEP}s)"
 HEALTH_OK=false
-
+STATUS="000"
 for attempt in $(seq 1 "${HEALTH_RETRIES}"); do
   sleep "${HEALTH_SLEEP}"
   STATUS=$(curl -s -o /dev/null -w "%{http_code}" --max-time 5 "${HEALTH_URL}/" 2>/dev/null || echo "000")
@@ -174,52 +194,44 @@ done
 if [[ "${HEALTH_OK}" == "true" ]]; then
   echo "  Health check passed (HTTP ${STATUS})"
   pm2 save >/dev/null 2>&1
+  echo ""
   echo "=== Deployment ${RELEASE_ID} successful ==="
   echo "  commit:   ${DEPLOY_COMMIT}"
   echo "  current:  ${RELEASE_DIR}"
   exit 0
 fi
 
-# ── Rollback ──────────────────────────────────────────────────────────────────
-echo ""
-echo "ERROR: Health check failed after ${HEALTH_RETRIES} attempts. Initiating rollback..."
+# ── [10] Rollback ──────────────────────────────────────────────────────────────
+stage 10 "Health check failed — rolling back"
+echo "  last status: HTTP ${STATUS}"
+echo "  tail of fe-point error log:"
+tail -20 "${LOG_DIR}/fe-point-err.log" 2>/dev/null | sed 's/^/    /' || echo "    (no log yet)"
 
 ROLLBACK_STATUS="failed"
-
 if [[ -n "${PREV_CURRENT}" && -d "${PREV_CURRENT}" && -f "${PREV_CURRENT}/ecosystem.config.js" ]]; then
   echo "  Rolling back to: ${PREV_CURRENT}"
   ln -sfn "${PREV_CURRENT}" "${CURRENT_LINK}"
-
   pm2 delete fe-point >/dev/null 2>&1 || true
-  pm2 start "${PREV_CURRENT}/ecosystem.config.js" >/dev/null 2>&1
-
-  ROLLBACK_OK=false
+  pm2 start "${PREV_CURRENT}/ecosystem.config.js" || fatal 10 "rollback: pm2 start failed"
   for attempt in $(seq 1 10); do
     sleep 2
     RSTATUS=$(curl -s -o /dev/null -w "%{http_code}" --max-time 5 "${HEALTH_URL}/" 2>/dev/null || echo "000")
     echo "  rollback attempt ${attempt}/10: HTTP ${RSTATUS}"
     if [[ "${RSTATUS}" == "200" || "${RSTATUS}" == "302" ]]; then
-      ROLLBACK_OK=true
+      ROLLBACK_STATUS="verified"
       break
     fi
   done
-
-  if [[ "${ROLLBACK_OK}" == "true" ]]; then
-    ROLLBACK_STATUS="verified"
+  if [[ "${ROLLBACK_STATUS}" == "verified" ]]; then
     echo "  Rollback verified. Previous release is live."
-    pm2 save >/dev/null 2>&1
   else
-    ROLLBACK_STATUS="failed"
-    echo "  CRITICAL: Rollback health check also failed. Manual intervention required."
-    pm2 list 2>&1
+    echo "  CRITICAL: rollback health check also failed — manual intervention required."
   fi
 else
-  echo "  No previous release to roll back to (first deployment or missing ecosystem config)."
-  ROLLBACK_STATUS="no-previous-release"
+  echo "  No previous release to roll back to."
 fi
 
 echo ""
 echo "=== Deployment ${RELEASE_ID} FAILED — rollback: ${ROLLBACK_STATUS} ==="
-echo "  Failed commit:  ${DEPLOY_COMMIT}"
-echo "  Active release: $(readlink ${CURRENT_LINK} 2>/dev/null || echo 'unknown')"
+echo "  active release: $(readlink ${CURRENT_LINK} 2>/dev/null || echo 'unknown')"
 exit 1

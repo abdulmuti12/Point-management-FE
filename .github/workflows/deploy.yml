@@ -36,40 +36,193 @@ jobs:
     runs-on: ubuntu-latest
     needs: check
 
+    # NOTE: this job never checks out the repo and never builds anything —
+    # it only SSHes into the server and runs the deploy script there.
+    # So its secrets are validated in the runner shell (echoing nothing)
+    # and passed to the server as variables.
+    env:
+      SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+      DEPLOY_HOST: ${{ secrets.DEPLOY_SSH_HOST }}
+      DEPLOY_USER: ${{ secrets.DEPLOY_SSH_USER }}
+      DEPLOY_PORT: ${{ secrets.DEPLOY_SSH_PORT || '22' }}
+      REPO_URL_SSH: ${{ secrets.REPO_URL_SSH || '' }}
+
     steps:
+      - name: Validate required secrets
+        run: |
+          # Presence checks only — values are never printed.
+          for v in SSH_KEY DEPLOY_HOST DEPLOY_USER; do
+            if [[ -z "${!v}" ]]; then
+              echo "::error::Secret ${v} is empty. Set it under repo → Settings → Secrets and variables → Actions."
+              exit 1
+            fi
+          done
+          # DEPLOY_PORT must be a valid port number.
+          if ! [[ "${DEPLOY_PORT}" =~ ^[0-9]+$ ]] || (( 10#${DEPLOY_PORT} < 1 || 10#${DEPLOY_PORT} > 65535 )); then
+            echo "::error::DEPLOY_SSH_PORT must be a number between 1 and 65535 (got: '${DEPLOY_PORT}')"
+            exit 1
+          fi
+          # The deploy key should at least be syntactically parseable.
+          if ! grep -qE '^-----BEGIN (OPENSSH |)PRIVATE KEY-----$' <<<"${SSH_KEY}"; then
+            echo "::error::DEPLOY_SSH_KEY does not look like a PEM private key."
+            exit 1
+          fi
+          echo "Secrets present: DEPLOY_SSH_KEY, DEPLOY_SSH_HOST (${DEPLOY_HOST}), DEPLOY_SSH_USER (${DEPLOY_USER}), DEPLOY_SSH_PORT (${DEPLOY_PORT})"
+          echo "REPO_URL_SSH: ${REPO_URL_SSH:-<using default git@github.com:abdulmuti12/point-management-frontend.git>}"
+
       - name: Deploy via SSH
-        env:
-          # GitHub Secrets to set on the repo:
-          #   DEPLOY_SSH_KEY   — private SSH key (add as GitHub secret, not in repo)
-          #   DEPLOY_SSH_HOST  — public IP / hostname of the deploy server
-          #   DEPLOY_SSH_USER  — SSH user (e.g. root or a deploy-only user)
-          #   DEPLOY_SSH_PORT  — SSH port (optional, defaults to 22)
-          #   REPO_URL_SSH     — git URL the server can reach (optional, has a default)
-          SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
-          DEPLOY_HOST: ${{ secrets.DEPLOY_SSH_HOST }}
-          DEPLOY_USER: ${{ secrets.DEPLOY_SSH_USER }}
-          DEPLOY_PORT: ${{ secrets.DEPLOY_SSH_PORT || '22' }}
-          REPO_URL_SSH: ${{ secrets.REPO_URL_SSH || '' }}
         run: |
           COMMIT_SHA="${GITHUB_SHA}"
           REPO_URL="${REPO_URL_SSH:-git@github.com:abdulmuti12/point-management-frontend.git}"
+          SSH_PORT="${DEPLOY_PORT}"
+          DEPLOY_HOSTNAME="${DEPLOY_HOST}"
+          DEPLOY_USERNAME="${DEPLOY_USER}"
+          deploy_script="/var/www/html/Point-management-FE-deploy/scripts/deploy.sh"
 
-          # ── SSH key setup ────────────────────────────────────────────────
+          echo "=== [step] preparing SSH key ==="
+          # Write the key, then verify the key pair is intact (public key
+          # derived from it must be non-empty). The key file is deleted
+          # when this step's shell exits (workflow job workspace cleanup
+          # plus explicit rm on success).
           mkdir -p ~/.ssh
           echo "${SSH_KEY}" | tr -d '\r' > ~/.ssh/deploy_key
           chmod 600 ~/.ssh/deploy_key
+          PUB_DERIVED="$(ssh-keygen -y -f ~/.ssh/deploy_key 2>&1 || true)"
+          if [[ -z "${PUB_DERIVED}" ]]; then
+            echo "::error::ssh-keygen failed — DEPLOY_SSH_KEY may be malformed, truncated, or not an ed25519/rsa key this runner supports. (The key file is not retained.)"
+            exit 1
+          fi
+          echo "  key loaded: ${PUB_DERIVED:0:25}… (${PUB_DERIVED:0:14})"
 
-          # ── Host key verification (NOT disabled) ───────────────────────
-          ssh-keyscan -t ed25519,rsa "${DEPLOY_HOST}" >> ~/.ssh/known_hosts 2>/dev/null
+          echo "=== [step] verifying host key (StrictHostKeyChecking=yes) ==="
+          # keyscan with the SAME port as the ssh below, visible errors.
+          ssh-keyscan -T 10 -p "${SSH_PORT}" -t ed25519,rsa "${DEPLOY_HOSTNAME}" 2>keyscan.err > keyscan.out
+          KEYSCAN_RC=$?
+          if [[ ${KEYSCAN_RC} -ne 0 || ! -s keyscan.out ]]; then
+            echo "::error::ssh-keyscan failed (exit ${KEYSCAN_RC}). Diagnostics:"
+            cat keyscan.err
+            echo "If the server's sshd uses a port other than ${SSH_PORT}, or blocks port ${SSH_PORT} from this IP range, fix that first."
+            exit 1
+          fi
+          cat keyscan.out >> ~/.ssh/known_hosts
           chmod 644 ~/.ssh/known_hosts
+          # The ed25519 keyscan line may be prefixed with the resolved
+          # hostname when keyscan follows a CNAME, so strip the first field.
+          FP="$(sed 's/^# //' keyscan.out | grep -E '^(ssh-ed25519|ssh-rsa)' | head -1 | awk '{print $1, $2}' | ssh-keygen -E SHA256 -lf /dev/stdin 2>/dev/null | awk '{print $2}')"
+          echo "  host key fingerprint (first, ed25519 preferred): ${FP:-<none>}"
+          if [[ -z "${FP}" ]]; then
+            echo "::error::no ed25519 host key returned — expected one from the deploy server. Refusing to continue."
+            exit 1
+          fi
 
-          # ── Run deploy script on server ─────────────────────────────────
+          echo "=== [step] testing SSH login (${DEPLOY_USERNAME}@${DEPLOY_HOSTNAME}:${SSH_PORT}) ==="
           ssh \
             -i ~/.ssh/deploy_key \
             -o StrictHostKeyChecking=yes \
             -o UserKnownHostsFile=~/.ssh/known_hosts \
             -o BatchMode=yes \
-            -p "${DEPLOY_PORT}" \
-            "${DEPLOY_USER}@${DEPLOY_HOST}" \
+            -o ConnectTimeout=10 \
+            -o ServerAliveInterval=15 \
+            -o ServerAliveCountMax=4 \
+            -p "${SSH_PORT}" \
+            "${DEPLOY_USERNAME}@${DEPLOY_HOSTNAME}" \
+            'echo "SSH_LOGIN_OK user=$(id -un) host=$(hostname)"; command -v node npm pm2 git || { echo "MISSING_TOOL: one of node/npm/pm2/git not in PATH"; exit 2; }'
+          LOGIN_RC=$?
+          if [[ ${LOGIN_RC} -ne 0 ]]; then
+            echo "::error::SSH login failed (exit ${LOGIN_RC})."
+            if [[ ${LOGIN_RC} -eq 2 ]]; then
+              echo "  → node, npm, pm2 or git is missing in the non-interactive session PATH on the server."
+            fi
+            # Diagnostics, never printing the key: host reachability + pubkey
+            # acceptance check with the same key/identity, with BatchMode=yes
+            # so it can never fall back to an interactive password prompt.
+            PROBE="$(ssh -i ~/.ssh/deploy_key \
+                  -o StrictHostKeyChecking=yes \
+                  -o UserKnownHostsFile=~/.ssh/known_hosts \
+                  -o BatchMode=yes \
+                  -o ConnectTimeout=10 \
+                  -p "${SSH_PORT}" \
+                  "${DEPLOY_USERNAME}@${DEPLOY_HOSTNAME}" 'true' 2>&1 || true)"
+            if grep -q "Permission denied" <<<"${PROBE}"; then
+              echo "  → 'Permission denied (publickey)': this private key is not accepted for ${DEPLOY_USERNAME} on the server."
+              echo "    Check: (a) the public half of DEPLOY_SSH_KEY is in ${DEPLOY_USERNAME}'s authorized_keys on the server,"
+              echo "    (b) ~/.ssh/authorized_keys is not empty, (c) sshd_config allows pubkey auth for this user,"
+              echo "    (d) the key is not locked/expired (ssh-keygen -l on the public half)."
+            elif grep -qE "timeout|timed out" <<<"${PROBE}"; then
+              echo "  → connection timed out — server unreachable or port ${SSH_PORT} blocked from this runner's IP range."
+            else
+              echo "  → raw probe output (redacted of secrets):"
+              echo "${PROBE}" | grep -viE 'private key|BEGIN|key=' | head -10
+            fi
+            exit 1
+          fi
+          echo "  SSH login OK."
+
+          echo "=== [step] verifying deploy script on server ==="
+          ssh \
+            -i ~/.ssh/deploy_key \
+            -o StrictHostKeyChecking=yes \
+            -o UserKnownHostsFile=~/.ssh/known_hosts \
+            -o BatchMode=yes \
+            -o ConnectTimeout=10 \
+            -p "${SSH_PORT}" \
+            "${DEPLOY_USERNAME}@${DEPLOY_HOSTNAME}" \
+            "test -f ${deploy_script} && echo 'script found: ${deploy_script}' || { echo 'MISSING: ${deploy_script}'; exit 1; }; bash -n ${deploy_script} && echo 'syntax OK'"
+          SCRIPT_RC=$?
+          if [[ ${SCRIPT_RC} -ne 0 ]]; then
+            echo "::error::deploy script check failed (exit ${SCRIPT_RC})."
+            exit 1
+          fi
+
+          echo "=== [step] executing deploy script ==="
+          echo "  commit: ${COMMIT_SHA}"
+          set +e
+          ssh \
+            -i ~/.ssh/deploy_key \
+            -o StrictHostKeyChecking=yes \
+            -o UserKnownHostsFile=~/.ssh/known_hosts \
+            -o BatchMode=yes \
+            -o ConnectTimeout=10 \
+            -o ServerAliveInterval=30 \
+            -o ServerAliveCountMax=8 \
+            -p "${SSH_PORT}" \
+            "${DEPLOY_USERNAME}@${DEPLOY_HOSTNAME}" \
             "DEPLOY_COMMIT=${COMMIT_SHA} REPO_URL=${REPO_URL} \
-             bash /var/www/html/Point-management-FE-deploy/scripts/deploy.sh"
+             bash ${deploy_script}"
+          DEPLOY_RC=$?
+          set -e
+
+          if [[ ${DEPLOY_RC} -ne 0 ]]; then
+            echo ""
+            echo "::error::Deploy script exited with code ${DEPLOY_RC}."
+            echo "The script prints FATAL [stage] diagnostics on failure — see the logs above."
+            echo "Verify the release state with: pm2 list && curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:3003/login"
+            exit ${DEPLOY_RC}
+          fi
+
+          echo "=== [step] verifying live app after deploy ==="
+          ssh \
+            -i ~/.ssh/deploy_key \
+            -o StrictHostKeyChecking=yes \
+            -o UserKnownHostsFile=~/.ssh/known_hosts \
+            -o BatchMode=yes \
+            -o ConnectTimeout=10 \
+            -p "${SSH_PORT}" \
+            "${DEPLOY_USERNAME}@${DEPLOY_HOSTNAME}" \
+            'LOGIN_CODE=$(curl -s -o /dev/null -w "%{http_code}" http://127.0.0.1:3003/login); \
+             CHUNKS=$(curl -s http://127.0.0.1:3003/login | grep -oE "/_next/static/chunks/[^"]+\.js" | head -3 | while read p; do curl -s -o /dev/null -w "%{http_code} " "http://127.0.0.1:3003$p"; done); \
+             echo "login page: HTTP ${LOGIN_CODE}"; \
+             echo "chunk status: ${CHUNKS}"; \
+             [ "${LOGIN_CODE}" = "200" ] && ! grep -q "404" <<< "${CHUNKS}" && echo "POST_DEPLOY_CHECK: OK" || { echo "POST_DEPLOY_CHECK: FAILED"; exit 1; }'
+          POST_RC=$?
+          if [[ ${POST_RC} -ne 0 ]]; then
+            echo "::error::Post-deploy verification failed — the app or its static assets are not responding correctly."
+            echo "Check the deploy script's rollback output above and fe-point's PM2 status."
+            exit 1
+          fi
+
+          echo "  post-deploy verification passed"
+
+          rm -f ~/.ssh/deploy_key
+          echo ""
+          echo "=== Deployment of ${COMMIT_SHA} completed successfully ==="

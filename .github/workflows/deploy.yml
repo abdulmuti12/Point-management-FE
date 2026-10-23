@@ -106,12 +106,15 @@ jobs:
           fi
           cat keyscan.out >> ~/.ssh/known_hosts
           chmod 644 ~/.ssh/known_hosts
-          # The ed25519 keyscan line may be prefixed with the resolved
-          # hostname when keyscan follows a CNAME, so strip the first field.
-          FP="$(sed 's/^# //' keyscan.out | grep -E '^(ssh-ed25519|ssh-rsa)' | head -1 | awk '{print $1, $2}' | ssh-keygen -E SHA256 -lf /dev/stdin 2>/dev/null | awk '{print $2}')"
+          # A keyscan key line looks like "NAME ssh-ed25519 B64DATA" where NAME
+          # is the host/IP keyscan was given, so the key type is field 2 and
+          # the key data is field 3. (A variant that strips the first field
+          # before matching is a bug: the match will fail and FP will be
+          # empty even though keyscan returned a valid host key.)
+          FP="$(grep -E '^[^#]*[[:space:]](ssh-ed25519|ssh-rsa)' keyscan.out | head -1 | awk '{print $2, $3}' | ssh-keygen -E SHA256 -lf /dev/stdin 2>/dev/null | awk '{print $2}')"
           echo "  host key fingerprint (first, ed25519 preferred): ${FP:-<none>}"
           if [[ -z "${FP}" ]]; then
-            echo "::error::no ed25519 host key returned — expected one from the deploy server. Refusing to continue."
+            echo "::error::Failed to compute a host key fingerprint even though keyscan returned a key. keyscan.out had $(grep -cE '^[^#]*[[:space:]](ssh-ed25519|ssh-rsa|ecdsa)' keyscan.out || true) key line(s); total $(wc -l < keyscan.out) line(s)."
             exit 1
           fi
 

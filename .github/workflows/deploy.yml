@@ -36,10 +36,9 @@ jobs:
     runs-on: ubuntu-latest
     needs: check
 
-    # NOTE: this job never checks out the repo and never builds anything —
-    # it only SSHes into the server and runs the deploy script there.
-    # So its secrets are validated in the runner shell (echoing nothing)
-    # and passed to the server as variables.
+    # The deploy job SSHes into the server and runs the deploy script there.
+    # A checkout is required so that scripts/verify-deploy.sh (the post-deploy
+    # health-check script) is available on the runner for scp to the server.
     env:
       SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
       DEPLOY_HOST: ${{ secrets.DEPLOY_SSH_HOST }}
@@ -48,6 +47,9 @@ jobs:
       REPO_URL_SSH: ${{ secrets.REPO_URL_SSH || '' }}
 
     steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
       - name: Validate required secrets
         run: |
           # Presence checks only — values are never printed.
@@ -203,7 +205,55 @@ jobs:
             exit ${DEPLOY_RC}
           fi
 
+          # ── Post-deploy verification ─────────────────────────────────────────
+          # The post-deploy check script lives in the repo at
+          # scripts/verify-deploy.sh (checked out by the `check` job's
+          # workflow context, but the deploy job does not check out the
+          # repo — it only SSHes in). We therefore inline the script content
+          # via a single-quoted SSH remote command that uses `cat > /dev/null`
+          # style syntax — but more simply, we just pass the URL as the
+          # first positional argument to a compact remote one-liner that is
+          # safe inside single quotes (no ] inside double-quoted regexes).
+          #
+          # The check:
+          #   1. GET /login → expect 200
+          #   2. Grep up to 3 chunk JS paths from the HTML, GET each →
+          #      expect no 404
+          #
+          # The exit code of the remote command is captured directly; if
+          # non-zero the step fails with `::error::` and the workflow stays
+          # red. No `|| true`, no `continue-on-error`.
           echo "=== [step] verifying live app after deploy ==="
+          APP_URL="http://127.0.0.1:3003"
+          # Validate the URL before opening an SSH session for it.
+          if ! [[ "${APP_URL}" =~ ^https?://[0-9.]+:3003$ ]]; then
+            echo "::error::APP_URL '${APP_URL}' is not a valid local app URL (expected scheme://host:3003)."
+            exit 1
+          fi
+
+          # scp the verify-deploy.sh from the repo checkout into the
+          # /tmp of the server so the remote side has a local file to run.
+          # This avoids any nested-quoting issues — the script is a normal
+          # file, not an inline string.
+          scp \
+            -i ~/.ssh/deploy_key \
+            -o StrictHostKeyChecking=yes \
+            -o UserKnownHostsFile=~/.ssh/known_hosts \
+            -o BatchMode=yes \
+            -o ConnectTimeout=10 \
+            -P "${SSH_PORT}" \
+            "${GITHUB_WORKSPACE}/scripts/verify-deploy.sh" \
+            "${DEPLOY_USERNAME}@${DEPLOY_HOSTNAME}:/tmp/verify-deploy.sh"
+          scp_rc=$?
+          if [[ ${scp_rc} -ne 0 ]]; then
+            echo "::error::scp of verify-deploy.sh to server failed (exit ${scp_rc})."
+            exit 1
+          fi
+          echo "  verify-deploy.sh copied to server:/tmp/verify-deploy.sh"
+
+          # Run the post-deploy check on the server.
+          # The script is a file — no nested quoting, no heredoc, no
+          # base64. APP_URL is passed as a positional argument.
           ssh \
             -i ~/.ssh/deploy_key \
             -o StrictHostKeyChecking=yes \
@@ -212,18 +262,13 @@ jobs:
             -o ConnectTimeout=10 \
             -p "${SSH_PORT}" \
             "${DEPLOY_USERNAME}@${DEPLOY_HOSTNAME}" \
-            'LOGIN_CODE=$(curl -s -o /dev/null -w "%{http_code}" http://127.0.0.1:3003/login); \
-             CHUNKS=$(curl -s http://127.0.0.1:3003/login | grep -oE "/_next/static/chunks/[^"]+\.js" | head -3 | while read p; do curl -s -o /dev/null -w "%{http_code} " "http://127.0.0.1:3003$p"; done); \
-             echo "login page: HTTP ${LOGIN_CODE}"; \
-             echo "chunk status: ${CHUNKS}"; \
-             [ "${LOGIN_CODE}" = "200" ] && ! grep -q "404" <<< "${CHUNKS}" && echo "POST_DEPLOY_CHECK: OK" || { echo "POST_DEPLOY_CHECK: FAILED"; exit 1; }'
+            "bash /tmp/verify-deploy.sh ${APP_URL}"
           POST_RC=$?
           if [[ ${POST_RC} -ne 0 ]]; then
-            echo "::error::Post-deploy verification failed — the app or its static assets are not responding correctly."
+            echo "::error::Post-deploy verification failed (exit ${POST_RC}) — the app or its static assets are not responding correctly."
             echo "Check the deploy script's rollback output above and fe-point's PM2 status."
             exit 1
           fi
-
           echo "  post-deploy verification passed"
 
           rm -f ~/.ssh/deploy_key

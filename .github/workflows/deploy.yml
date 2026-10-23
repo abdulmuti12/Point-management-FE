@@ -1,0 +1,75 @@
+name: Deploy to Production
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: production-deploy
+  # Do NOT cancel an in-progress deployment — queue it instead
+  cancel-in-progress: false
+
+jobs:
+  check:
+    name: Lint & TypeScript Check
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          cache: "npm"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Lint
+        run: npm run lint
+
+  deploy:
+    name: Deploy to Production
+    runs-on: ubuntu-latest
+    needs: check
+
+    steps:
+      - name: Deploy via SSH
+        env:
+          # GitHub Secrets to set on the repo:
+          #   DEPLOY_SSH_KEY   — private SSH key (add as GitHub secret, not in repo)
+          #   DEPLOY_SSH_HOST  — public IP / hostname of the deploy server
+          #   DEPLOY_SSH_USER  — SSH user (e.g. root or a deploy-only user)
+          #   DEPLOY_SSH_PORT  — SSH port (optional, defaults to 22)
+          #   REPO_URL_SSH     — git URL the server can reach (optional, has a default)
+          SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+          DEPLOY_HOST: ${{ secrets.DEPLOY_SSH_HOST }}
+          DEPLOY_USER: ${{ secrets.DEPLOY_SSH_USER }}
+          DEPLOY_PORT: ${{ secrets.DEPLOY_SSH_PORT || '22' }}
+          REPO_URL_SSH: ${{ secrets.REPO_URL_SSH || '' }}
+        run: |
+          COMMIT_SHA="${GITHUB_SHA}"
+          REPO_URL="${REPO_URL_SSH:-git@github.com:abdulmuti12/Point-management-FE.git}"
+
+          # ── SSH key setup ────────────────────────────────────────────────
+          mkdir -p ~/.ssh
+          echo "${SSH_KEY}" | tr -d '\r' > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+
+          # ── Host key verification (NOT disabled) ───────────────────────
+          ssh-keyscan -t ed25519,rsa "${DEPLOY_HOST}" >> ~/.ssh/known_hosts 2>/dev/null
+          chmod 644 ~/.ssh/known_hosts
+
+          # ── Run deploy script on server ─────────────────────────────────
+          ssh \
+            -i ~/.ssh/deploy_key \
+            -o StrictHostKeyChecking=yes \
+            -o UserKnownHostsFile=~/.ssh/known_hosts \
+            -o BatchMode=yes \
+            -p "${DEPLOY_PORT}" \
+            "${DEPLOY_USER}@${DEPLOY_HOST}" \
+            "DEPLOY_COMMIT=${COMMIT_SHA} REPO_URL=${REPO_URL} \
+             bash /var/www/html/Point-management-FE-deploy/scripts/deploy.sh"

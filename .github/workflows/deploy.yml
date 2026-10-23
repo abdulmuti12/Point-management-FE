@@ -52,7 +52,7 @@ jobs:
           REPO_URL_SSH: ${{ secrets.REPO_URL_SSH || '' }}
         run: |
           COMMIT_SHA="${GITHUB_SHA}"
-          REPO_URL="${REPO_URL_SSH:-git@github.com:abdulmuti12/Point-management-FE.git}"
+          REPO_URL="${REPO_URL_SSH:-git@github.com:abdulmuti12/point-management-frontend.git}"
 
           # ── SSH key setup ────────────────────────────────────────────────
           mkdir -p ~/.ssh
